@@ -1,0 +1,8 @@
+*.Rdata
+*.gz
+*.tar
+*.soft
+GSE*
+results
+*.roxygen
+*.Rcheck

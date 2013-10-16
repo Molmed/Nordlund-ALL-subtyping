@@ -1,0 +1,13 @@
+Encoding: UTF-8
+Package: nordlund2014
+Type: Package
+Title: Code accompanying the Nordlund 2014 paper
+Version: 1.0-5
+Date: 2013-10-16
+Author: Christofer Backlin, Jessica Nordlund
+Maintainer: Christofer Backlin <christofers.backlin@medsci.uu.se>
+Description: Some functions implemented in C to speed up computations.
+Depends: predictBase
+License: GPL (>=2)
+LazyLoad: yes
+LazyData: yes
