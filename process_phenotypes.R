@@ -48,6 +48,7 @@ new.sub$subtype <- factor(new.sub$subtype, levels=c("reference", "T-ALL", "HeH",
         "11q23/MLL", "t(1;19)", "dic(9;20)", "t(9;22)", "iAMP21", "<45chr",
         ">67chr", "biclone", "other", "normal", "no result"))
 met.pheno$subtype <- new.sub$subtype[match(met.pheno$id, new.sub$id)]
+met.pheno$sex <- factor(new.sub$sex)[match(met.pheno$id, new.sub$id)]
 
 
 save(met.pheno, file="data/phenotypes.Rdata")
