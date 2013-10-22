@@ -31,7 +31,7 @@ pre.trans.450k <- function(x, y, fold, feat=rep(TRUE, ncol(x)), dbeta, na.frac, 
     if(!missing(dbeta)){
         y.int <- as.integer(y)
         y.int[na.fill(fold, TRUE)] <- 0L
-        feat <- feat & column.max.delta.beta(x, y.int, feat) > dbeta
+        feat <- feat & na.fill(column.max.delta.beta(x, y.int, feat), FALSE) > dbeta
     }
     if(!missing(na.frac)){
         feat <- feat & column.na.frac(x, na.frac, na.fill(!fold, FALSE), feat)

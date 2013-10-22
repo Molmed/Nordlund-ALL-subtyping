@@ -1,7 +1,8 @@
 #===============================================================================
 #
 #   This script sets up the environment required for the analysis code.
-#   After this script has finised you can run `analyze.R`.
+#   After this script has finised you can run `analyze_tune.R` and
+#   `analyze_final.R`.
 #
 #-------------------------------------------------------------------------------
 
@@ -10,13 +11,14 @@
 #   Make directory structure
 
 dir.create("data", showWarnings=FALSE)
+dir.create("tuning", showWarnings=FALSE)
 dir.create("results", showWarnings=FALSE)
 
 
 #-------------------------------o
 #   Install required packages
 
-required.pkg <- c("pamr", "predict", "roxygen2")
+required.pkg <- c("pamr", "predict", "roxygen2", "doSNOW")
 required.bioc.pkg <- c("GEOquery")
 installed.pkg <- rownames(installed.packages())
 

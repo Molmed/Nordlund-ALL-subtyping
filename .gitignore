@@ -1,8 +1,15 @@
+# Data
 *.Rdata
 *.gz
 *.tar
 *.soft
 GSE*
+
+# Output folders
 results
+tuning
+
+# Temporary files
 *.roxygen
 *.Rcheck
+.*.swp

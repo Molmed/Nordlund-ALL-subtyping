@@ -1,10 +1,21 @@
 #
-#   This script performs the analyses that the paper is based on.
-#   
-#   Since it takes quite some time to carry out all of it, it is written in a
-#   way that allows halting and resuming without substantial loss of results.
+#   ooooo      ooo                 .               .o. 
+#   `888b.     `8'               .o8               888 
+#    8 `88b.    8    .ooooo.   .o888oo   .ooooo.   888 
+#    8   `88b.  8   d88' `88b    888    d88' `88b  Y8P 
+#    8     `88b.8   888   888    888    888ooo888  `8' 
+#    8       `888   888   888    888 .  888    .o  .o. 
+#   o8o        `8   `Y8bod8P'    "888"  `Y8bod8P'  Y8P 
 #
-#   
+#
+#   This file is sourced by the other analysis scripts and should not be run
+#   directly by the user.
+#
+#   The files should be run in the order:
+#    - setup.R
+#    - analyze_tune.R (preferably on a computation cluster or multicore machine)
+#    - analyze_final.R
+#
 #===============================================================================
 #   Load data and packages
 #-------------------------------------------------------------------------------
@@ -14,7 +25,7 @@ tryCatch({
     if(!exists("met.data"))  load("methylation.Rdata")
     if(!exists("met.annot")) load("annotations.Rdata")
     if(!exists("met.pheno")) load("phenotypes.Rdata")
-    setwd("../results")
+    setwd("..")
 
     library(pamr)
     library(predict)
@@ -25,20 +36,15 @@ tryCatch({
 # Remove sample not used in the study
 sample.idx <- !is.na(met.pheno$subtype) & !grepl("rep[2-9]$", met.pheno$id)
 met.pheno <- met.pheno[sample.idx,]
-#met.data <- t(met.data[,sample.idx])
-
-   # TEMP
-   site.ind <- 1:1000
-   met.data <- t(met.data[site.ind, sample.idx])
-   met.annot <- met.annot[site.ind,]
+met.data <- t(met.data[,sample.idx])
 
 
 #===============================================================================
-#   Initialize
+#   Prepare responses and output variables
 #-------------------------------------------------------------------------------
 
-if(file.exists("pred.Rdata")){
-    load("pred.Rdata")
+if(file.exists("results/pred.Rdata")){
+    load("results/pred.Rdata")
 } else {
     attach(met.pheno)
 
@@ -69,13 +75,17 @@ if(file.exists("pred.Rdata")){
     tmp <- factor(paste(subtype, sex))
     cv <- resample.crossval(tmp, nfold=5, nrep=5)
     inner.cv <- lapply(cv, function(idx) resample.crossval(tmp, 5, 5, subset=!idx))
+    rm(tmp)
 
     feat.sel <- cons <- structure(vector("list", ncol(y)), names=names(y))
+    cv.feat.sel <- replicate(length(cv), feat.sel, simplify=FALSE)
     pred <- NULL
+    cv.pred <- vector("list", ncol(cv))
     
     save.workspace <- function(){
-        save(sample.idx, y, cv, class.types, known.types, unknown.types,
-             feat.sel, cons, pred, file="pred.Rdata")
+        save(sample.idx, y, cv, inner.cv, class.types, known.types, unknown.types,
+             feat.sel, cons, pred, cv.feat.sel, cv.pred, save.workspace,
+             file="results/pred.Rdata")
     }
     save.workspace()
     detach(met.pheno)
@@ -83,7 +93,7 @@ if(file.exists("pred.Rdata")){
 
 
 #===============================================================================
-#   Perform classification
+#   Feature selection plugin for predict::batch.predict()
 #-------------------------------------------------------------------------------
 
 design.feature_selection <- function(x, y, chr, cv){
@@ -92,10 +102,14 @@ design.feature_selection <- function(x, y, chr, cv){
     } else {
         cv[is.na(y),] <- NA
     }
-    my.pre.trans <- function(...)
-        pre.trans.450k(..., feat=met.annot$CHR %in% chr, dbeta=.2, na.frac=.1)
-    my.pred <- batch.predict(x, y, "nsc", test.subset=cv, error.fun=error.rate,
-        pre.trans=my.pre.trans, save.fits=FALSE, save.vimp=TRUE, .verbose=TRUE)
+    my.pre.trans <- function(...){
+        sets <- pre.trans.450k(..., feat=met.annot$CHR %in% chr, dbeta=.2, na.frac=.1)
+        predict::trace.msg(3, "%i features passed filter.", ncol(sets$design), time=FALSE)
+        sets
+    }
+
+    my.pred <- batch.predict(x, y, "nsc", test.subset=cv,
+        pre.trans=my.pre.trans, save.fits=TRUE, save.vimp=TRUE, .verbose=TRUE)
     # Return an integer vector of how many times each feature had a coefficinent != 0
     apply(sapply(subtree(my.pred$cv, T, "nsc", "vimp", flatten=2),
                          function(x) apply(abs(x), 1, sum) > 1e-12), 
@@ -103,48 +117,5 @@ design.feature_selection <- function(x, y, chr, cv){
     # 1e-12 for avoiding comparison with exactly 0.
     # Might not be an issue, but doesn't harm.
 }
-
-
-# Select sites
-for(my.class in names(y)[sapply(feat.sel, is.null)]){
-    cat("\nSelecting features for", my.class, "\n")
-    feat.sel[[my.class]] <- design("feature_selection", met.data, y[[my.class]],
-                    chr = if(my.class == "sex") c(1:22, "X") else 1:22, cv = cv)
-    save.workspace()
-}
-cons.sites <- do.call(rbind, lapply(names(y), function(my.class){
-    data.frame(Subtype = my.class,
-               TargetID = met.annot$TargetID[feat.sel[[my.class]] >= 10],
-               stringsAsFactors=FALSE)
-}))
-write.table(cons.sites, "consensus_sites.csv", quote=FALSE, sep="\t",
-            row.names=FALSE)
-
-
-# Train consensus classifiers
-cons.met <- impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
-                       distmat="auto")
-for(my.class in names(y)[sapply(cons, is.null)]){
-    cat("Making final classifier for", my.class, "\n")
-    idx <- !is.na(y[[my.class]])
-    cons[[my.class]] <- design("nsc", cons.met[idx,], y[[my.class]][idx])
-}
-
-
-# Predict class probabilities of all samples
-# (including the ones used for training)
-pred <- lapply(cons, predict, cons.met)
-save.workspace()
-cons.pred <- data.frame(met.pheno,
-    lapply(pred, function(p) p$prob[,1]))
-names(cons.pred)[ncol(cons.pred)] <- "sex.female"
-write.table(cons.pred, "consensus_predictions.csv",
-    quote=FALSE, sep="\t", row.names=FALSE)
-
-
-#===============================================================================
-#   Estimate performance and tune with an additional layer of CV
-#-------------------------------------------------------------------------------
-
 
 

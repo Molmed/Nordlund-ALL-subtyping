@@ -15,11 +15,18 @@ Figures were annotated using the [`biomaRt`](http://www.bioconductor.org/package
 
 Instructions
 ------------
-Download all scripts in this repo to a new directory. The most convenient way to do this on a linux/unix system is to clone the whole repo. Then run the files `setup.R` and `analyse.R`.
+Download all scripts in this repo to a new directory. The most convenient way to do this on a linux/unix system is to clone the whole repo and run the files in the following order:
 
     git clone git@github.com:Molmed/Nordlund-2013.git
-    cd Nordlund-Backlin-2013
+    cd Nordlund-2013
     R -f setup.R
-    R -f analyze.R
+    R -f analyze_tune.R
+    R -f analyze_final.R
 
-`setup.R` will download all data from [GEO](http://www.ncbi.nlm.nih.gov/geo/), prepare it for use in R and store it in a new subfolder called `data`. `analyse.R` will run the analyses, produce the results and save them in a new subfolder called `results`. Plots are not produced.
+- `setup.R` will download all data from [GEO](http://www.ncbi.nlm.nih.gov/geo/), prepare it for use in R and store it in a new subfolder called `data`.
+- `analyze_tune.R` will tune model parameters and estimate performance.
+- `analyze_final.R` will build the the final model that was presented in the paper, and produce some tables of the results.
+
+Notice that `analyze_tune.R` is designed for parallelization on a computer cluster or powerful multicore machine, whereas `analyze_final.R` is designed to be run on a single core on a computer with at least 15 GB RAM.
+
+Plots are not produced.
