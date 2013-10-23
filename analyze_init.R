@@ -1,3 +1,6 @@
+#!/opt/apps/R/3.0.1/bin/Rscript
+
+#===============================================================================
 #
 #   ooooo      ooo                 .               .o. 
 #   `888b.     `8'               .o8               888 
@@ -78,13 +81,11 @@ if(file.exists("results/pred.Rdata")){
     rm(tmp)
 
     feat.sel <- cons <- structure(vector("list", ncol(y)), names=names(y))
-    cv.feat.sel <- replicate(length(cv), feat.sel, simplify=FALSE)
     pred <- NULL
-    cv.pred <- vector("list", ncol(cv))
     
     save.workspace <- function(){
         save(sample.idx, y, cv, inner.cv, class.types, known.types, unknown.types,
-             feat.sel, cons, pred, cv.feat.sel, cv.pred, save.workspace,
+             feat.sel, cons, pred, save.workspace,
              file="results/pred.Rdata")
     }
     save.workspace()

@@ -1,36 +1,69 @@
+#!/opt/apps/R/3.0.1/bin/Rscript
 
 #===============================================================================
-#
 #   Parameter tuning and performance estimation
+#-------------------------------------------------------------------------------
 #
-#   It would be criminally inefficient not to parallelize the following section.
-#   However, since each worker requires about 15 GB of RAM be sure to set the
-#   number of workers carefully. We used 3 nodes on Uppsala University's UPPMAX
-#   cluster with only one worker each.
+#   This script supports two forms of parallelizations:
+#
+#       - Multithreading within a single CPU with multiple cores
+#       - Manual batch execution in parallel on multiple machines
+#
+#   Multithreading peak memory requirement of about 13 GB of RAM/core, so set the variable
+#   `number.of.cores` accordingly.
+#
+#   To use only one machine, simply source this script into an R session, or
+#   batch execute it in any of the following ways:
+#
+#       $ R -f analyze_tune.R
+#       $ ./analyze_tune.R --no-save --no-restore
+#       $ R CMD BATCH analyze_tune.R --no-save --no-restore
+#   
+#   To use more than one machine, divide the folds between them manually, and
+#   execute the script like this (on the separate machines of course):
+#
+#       $ R -f analyze_tune.R --args 1 2 3 4 5 6 7 8 9
+#       $ R -f analyze_tune.R --args 10 11 12 13 14 15 16 17
+#       $ R -f analyze_tune.R --args 18 19 20 21 22 23 24 25
+#
+#   The above will create three separate processes that all multithread
+#   internally. If the number of folds given exceeds the designated number of
+#   cores they will be queued.
+#
+#   Should the script be terminated unexpectedly, it will resume from where it
+#   stopped when restarted.
 #
 #-------------------------------------------------------------------------------
 
-number.of.workers <- 3
+number.of.cores <- 3
+
+# If we run on the UPPMAX cluster, maximize the number of processes
+if(grepl("^q\\d+\\.uppmax\\.uu\\.se$", Sys.info()["nodename"])){
+    max.mem <- as.integer(sub("^MemTotal:\\s+(\\d+) kB$", "\\1",
+        system("head /proc/meminfo -n 1", intern=TRUE)))
+    number.of.cores <- floor(max.mem/13e6)
+}
+
+a <- commandArgs()
+if("--args" %in% a){
+    my.folds <- as.integer(a[(which(a == "--args") + 1):length(a)])
+} else {
+    my.folds <- seq_along(cv)
+}
+number.of.cores <- min(number.of.cores, length(my.folds))
 
 source("analyze_init.R")
+dir.create("tuning", showWarnings=FALSE)
+
+library(doMC)
+registerDoMC(number.of.cores)
+
 
 
 #-------------------------------o
-#   Setup parallelization
-
-library(doSNOW)
-cl <- makeCluster(number.of.workers)
-registerDoSNOW(cl)
-clusterExport(cl, c("met.pheno", "met.data", "met.annot", "y", "inner.cv", "design.feature_selection"))
-clusterEvalQ(cl, library(nordlund2014))
-dir.create("tuning", showWarnings=FALSE)
-
-
-#===============================================================================
 #   Calculate
-#-------------------------------------------------------------------------------
 
-foreach(i=seq_along(cv)) %dopar% {
+foreach(i=my.folds) %dopar% {
     outfile <- sprintf("tuning/fold_%i.Rdata", i)
     if(file.exists(outfile)){
         load(outfile)
@@ -54,37 +87,6 @@ foreach(i=seq_along(cv)) %dopar% {
         })
     }
     sink()
-
     return(NULL)
 }
-stopCluster(cl)
-
-
-#===============================================================================
-#   Assumble the results
-#-------------------------------------------------------------------------------
-
-for(i in seq_along(cv)){
-
-
-    my.cons.sites <- do.call(rbind, lapply(names(y), function(my.class){
-        data.frame(Subtype = my.class,
-                   TargetID = met.annot$TargetID[feat.sel[[my.class]] >= 10],
-                   stringsAsFactors=FALSE)
-    }))
-
-    # Train consensus classifiers
-    my.cons <- structure(vector("list", ncol(y)), names=names(y))
-    my.cons.met <- impute.knn(
-        met.data[,met.annot$TargetID %in% cons.sites$TargetID], distmat="auto")
-    for(my.class in names(y)[sapply(my.cons, is.null)]){
-        cat("Making final classifier for", my.class, "\n")
-        idx <- !is.na(y[[my.class]]) & na.fill(!cv[[i]], FALSE)
-        my.cons[[my.class]] <- design("nsc", cons.met[idx,], y[[my.class]][idx])
-    }
-
-    # Predict class probabilities of held out samples
-    cv.pred[[i]] <- lapply(my.cons, predict, my.cons.met)
-}
-save.workspace()
 
