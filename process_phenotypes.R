@@ -1,5 +1,16 @@
+#!/opt/apps/R/3.0.1/bin/Rscript
+
 #===============================================================================
 #   Download and process phenotypes
+#
+#   This dataset was originally uploaded for the Nordlund & Bäcklin et al.
+#   paper. Since then the subtypes of the samples have been revised, and the
+#   dataset is updated accordingly in the final section of this file.
+#
+#   References:
+#    - Genome-wide signatures of differential DNA methylation in pediatric acute
+#      lymphoblastic leukemia, Nordlund & Bäcklin et al., Genome Biology 2013,
+#      14:r105.
 #-------------------------------------------------------------------------------
 
 require(GEOquery)
@@ -49,7 +60,6 @@ new.sub$subtype <- factor(new.sub$subtype, levels=c("reference", "T-ALL", "HeH",
         ">67chr", "biclone", "other", "normal", "no result"))
 met.pheno$subtype <- new.sub$subtype[match(met.pheno$id, new.sub$id)]
 met.pheno$sex <- factor(new.sub$sex)[match(met.pheno$id, new.sub$id)]
-
 
 save(met.pheno, file="data/phenotypes.Rdata")
 

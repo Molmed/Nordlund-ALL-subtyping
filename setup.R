@@ -18,7 +18,7 @@ dir.create("results", showWarnings=FALSE)
 #-------------------------------o
 #   Install required packages
 
-required.pkg <- c("pamr", "predict", "roxygen2", "doSNOW")
+required.pkg <- c("doMC", "pamr", "predict", "roxygen2")
 required.bioc.pkg <- c("GEOquery")
 installed.pkg <- rownames(installed.packages())
 

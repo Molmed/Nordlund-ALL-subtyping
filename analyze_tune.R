@@ -9,8 +9,8 @@
 #       - Multithreading within a single CPU with multiple cores
 #       - Manual batch execution in parallel on multiple machines
 #
-#   Multithreading peak memory requirement of about 13 GB of RAM/core, so set the variable
-#   `number.of.cores` accordingly.
+#   Multithreading peak memory requirement of about 13 GB of RAM/core, so set
+#   the variable `number.of.cores` accordingly.
 #
 #   To use only one machine, simply source this script into an R session, or
 #   batch execute it in any of the following ways:
@@ -57,7 +57,6 @@ dir.create("tuning", showWarnings=FALSE)
 
 library(doMC)
 registerDoMC(number.of.cores)
-
 
 
 #-------------------------------o

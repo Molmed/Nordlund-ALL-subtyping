@@ -46,6 +46,7 @@ met.data <- t(met.data[,sample.idx])
 #   Prepare responses and output variables
 #-------------------------------------------------------------------------------
 
+dir.create("results", showWarnings=FALSE)
 if(file.exists("results/pred.Rdata")){
     load("results/pred.Rdata")
 } else {

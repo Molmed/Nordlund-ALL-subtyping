@@ -1,8 +1,10 @@
+#!/opt/apps/R/3.0.1/bin/Rscript
+
 #===============================================================================
 #   Download and import methylation into R
 #
 #   This data consist of beta values normalized with peak based correction
-#   (Dedeurwaerder et al 2011).
+#   (Dedeurwaerder et al. 2011).
 #
 #   Beware that you need approximately 20 GB of RAM to run this script
 #   efficiently, since the gzipped text file is read into a 6.9 GB data frame

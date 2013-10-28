@@ -9,19 +9,25 @@ This code was produced by the groups of [Cancer Pharmacology and Computational M
 
 System requirements
 -------------------
-R version 3.0.1 or later. Packages 
-`doSNOW`,
-[`GEOquery`](http://www.bioconductor.org/packages/2.12/bioc/html/GEOquery.html)
+### Software
+Unix or Linux operating system with [R](http://r-project.org) version 3.0.1 or later (however, the code can be modified to run under Windows fairly easily). Packages 
+`doMC`,
+[`GEOquery`](http://www.bioconductor.org/packages/2.12/bioc/html/GEOquery.html),
 [`pamr`](http://www-stat.stanford.edu/~tibs/PAM/Rdist/doc/readme.html),
 `predict` and 
 [`roxygen2`](http://roxygen.org/), 
 are required, but are installed automatically. The `predict` package was developed inhouse and will soon be released on CRAN (manuscript in preparation).
 
+The `analyse450k` package appearing in the end of `analyze_final.R` is an inhouse package for data management, that will not be distributed. Instead, when the manuscript is accepted for publication and the validation dataset made publicly available on [GEO](http://www.ncbi.nlm.nih.gov/geo/), it will be incorporated into `setup.R`.
+
 Figures were annotated using the [`biomaRt`](http://www.bioconductor.org/packages/2.12/bioc/html/biomaRt.html) and [`GenomeGraphs`](http://www.bioconductor.org/packages/2.12/bioc/html/GenomeGraphs.html) packages. However, code for producing the figures is not included.
+
+### Hardware
+At peak memory, 20 GB of RAM is required (in `process_methylation.R`). If you wish to run the analysis in multicore mode 13 GB/core is required.
 
 Instructions
 ------------
-The most convenient way to run the analysis is to clone the repo to your computer and run the files in the following order (commands for unix/linux):
+The most convenient way to run the analysis is to clone the repo to your computer and run the files as shown below (commands for unix/linux). Notice that `analyze_tune.R` and `analyze_final.R` are designed to run on multiple CPU cores, and that you manually need to specify how many to use by editing the files, setting the variable `number.of.cores`. `analyze_tune.R` can also be run on multiple machines to reduce computation time further, see the comments in beginnig of the file for instructions.
 
     git clone git@github.com:Molmed/Nordlund-2013.git
     cd Nordlund-2013
@@ -30,7 +36,5 @@ The most convenient way to run the analysis is to clone the repo to your compute
     R -f analyze_final.R
 
 - `setup.R` will download all data from [GEO](http://www.ncbi.nlm.nih.gov/geo/) and prepare it for use in R.
-- `analyze_tune.R` will tune model parameters and estimate performance.
-- `analyze_final.R` will build the the final model that was presented in the paper, and produce some tables of the results.
-
-Notice that `analyze_tune.R` is designed for parallelization on a computer cluster or powerful multicore machine, whereas `analyze_final.R` is designed to be run on a single core on a computer with at least 15 GB RAM. Please review the parallelization settings in `analyze_tune.R` for best performance (it is single core by default).
+- `analyze_tune.R` will perform the doubly cross validated feature selection routine necessary for model parameter tuning and performance estimation.
+- `analyze_final.R` will perform the model tuning, estimate performance and build the the final model that was presented in the paper. It will also produce some tables of the results.
