@@ -10,7 +10,7 @@ This code was produced by the groups of [Cancer Pharmacology and Computational M
 System requirements
 -------------------
 ### Software
-Unix or Linux operating system with [R](http://r-project.org) version 3.0.1 or later (however, the code can be modified to run under Windows fairly easily). Packages 
+The code is written for a Unix or Linux operating system with [R](http://r-project.org) version 3.0.1 or later, but can be modified to run under Windows fairly easily. Packages 
 `doMC`,
 [`GEOquery`](http://www.bioconductor.org/packages/2.12/bioc/html/GEOquery.html),
 [`pamr`](http://www-stat.stanford.edu/~tibs/PAM/Rdist/doc/readme.html),
@@ -18,9 +18,7 @@ Unix or Linux operating system with [R](http://r-project.org) version 3.0.1 or l
 [`roxygen2`](http://roxygen.org/), 
 are required, but are installed automatically. The `predict` package was developed inhouse and will soon be released on CRAN (manuscript in preparation).
 
-The `analyse450k` package appearing in the end of `analyze_final.R` is an inhouse package for data management, that will not be distributed. Instead, when the manuscript is accepted for publication and the validation dataset made publicly available on [GEO](http://www.ncbi.nlm.nih.gov/geo/), it will be incorporated into `setup.R`.
-
-Figures were annotated using the [`biomaRt`](http://www.bioconductor.org/packages/2.12/bioc/html/biomaRt.html) and [`GenomeGraphs`](http://www.bioconductor.org/packages/2.12/bioc/html/GenomeGraphs.html) packages. However, code for producing the figures is not included.
+The `analyse450k` package appearing in the end of `analyze_final.R` is an inhouse package for data management, that will not be distributed. Instead, when the manuscript is accepted for publication and the validation dataset is made publicly available on [GEO](http://www.ncbi.nlm.nih.gov/geo/), it will be incorporated into `setup.R`.
 
 ### Hardware
 At peak memory, 20 GB of RAM is required (in `process_methylation.R`). If you wish to run the analysis in multicore mode 13 GB/core is required.

@@ -1,7 +1,7 @@
 Encoding: UTF-8
-Package: nordlund2014
+Package: nordlund2013
 Type: Package
-Title: Code accompanying the Nordlund 2014 paper
+Title: Code accompanying the Nordlund 2013 paper
 Version: 1.0-8
 Date: 2013-10-17
 Author: Christofer Backlin, Jessica Nordlund

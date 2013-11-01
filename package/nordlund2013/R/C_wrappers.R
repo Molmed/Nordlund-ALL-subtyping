@@ -17,7 +17,7 @@ column.max.delta.beta <- function(x, groups, feats){
     if(!is.logical(feats) || any(is.na(feats)))
         stop("Feature subset must be a logical vector without NAs.")
     if(!is.numeric(x)) stop("x must be numeric.")
-    .Call("column_max_delta_beta", PACKAGE="nordlund2014", x, groups, feats)
+    .Call("column_max_delta_beta", PACKAGE="nordlund2013", x, groups, feats)
 }
 
 ##' @param thres NA frequency threshold.
@@ -37,5 +37,5 @@ column.na.frac <- function(x, thres, subset, feats){
     if(missing(feats)) feats <- rep(TRUE, ncol(x))
     if(!is.logical(feats) || any(is.na(feats)))
         stop("Feature subset must be a logical vector without NAs.")
-    .Call("column_na_frac", PACKAGE="nordlund2014", x, thres, subset, feats)
+    .Call("column_na_frac", PACKAGE="nordlund2013", x, thres, subset, feats)
 }

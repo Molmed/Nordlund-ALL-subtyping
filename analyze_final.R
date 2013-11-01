@@ -30,7 +30,7 @@ registerDoMC(3)
 #   On top this distinction, two modelparameters are also tuned.
 #
 #    1. The number of folds a variable must be selected in to qualify for the
-#       final model (`times.selected`).
+#       final model (`times.chosen`).
 #    2. The threshold to use for calling a subtype (`thres`).
 #
 #-------------------------------------------------------------------------------
@@ -39,13 +39,18 @@ out.file <- "results/tuning.Rdata"
 if(file.exists(out.file)){
     load(out.file)
 } else {
-    thres.axs <- 0:100/100
-    sep.probs <- sep.errors <- comb.probs <- comb.errors <- vector("list", length(cv))
+    probs <- list(separate=vector("list", length(cv)),
+                  combined=vector("list", length(cv)))
+    error <- error.sex <-
+        list(separate = matrix(NA, length(cv), length(cv)),
+             combined = matrix(NA, length(cv), length(cv)))
+    sens <- spec <- ppv <- npv <-
+        list(separate = array(NA, c(length(y), length(cv), length(cv))),
+             combined = array(NA, c(length(y), length(cv), length(cv))))
 }
 cv.feat.sel <- vector("list", length(cv))
 save.assembly <- function()
-    save(sep.probs, sep.errors, comb.probs, comb.errors, thres.axs,
-         file=out.file)
+    save(probs, error, error.sex, sens, spec, ppv, npv, file=out.file)
 
 trace.msg(1, "Confirming that the tuning has completed", linebreak=FALSE)
 for(i in seq_along(cv)){
@@ -61,106 +66,82 @@ for(i in seq_along(cv)){
 }
 cat("\n")
 
-
-trace.msg(1, "Assembling tuning results")
+trace.msg(1, "Fitting classifiers and predicting test sets classes")
 for(i in seq_along(cv)){
     trace.msg(2, "Fold %i", i)
+    need.save <- FALSE
 
-    # Train classifiers and calculate test set probabilities using the separate approach
-    if(is.blank(sep.probs[[i]])){
-        trace.msg(3, "Classifying based on separate datasets ", linebreak=FALSE)
-        sep.probs[[i]] <- foreach(times.chosen=1:25) %dopar% {
-            my.pred <- lapply(seq_along(y), function(j){
-                idx <- cv.feat.sel[[i]][[j]] >= times.chosen
-                if(!any(idx)) return(NA)
-                my.met <- met.data[, idx, drop=FALSE]
-                my.y <- y[[j]]
-                my.y[is.na(my.y) & cv[[i]]] <- levels(my.y)[2]
-                batch.predict(my.met, my.y, "nsc", cv[i],
-                    pre.trans = pre.impute.median)
-            })
-            names(my.pred) <- names(y)
-            cat(".")
-            if(any(sapply(my.pred, is.null))) return(NA)
-            sapply(my.pred, function(p) p$cv[[1]]$nsc$prob[,1])
-        }
-        cat("\n")
-    }
-    if(is.blank(sep.errors[[i]])){
-        trace.msg(3, "Calculating errors ", linebreak=FALSE)
-        sep.errors[[i]] <- foreach(j = 1:25, .combine=cbind) %dopar% {
-            if(is.blank(sep.probs[[i]][[j]])) return(NA)
-            tmp <- foreach(thres = thres.axs, .combine=c) %do% {
-                preds <- lapply(apply(sep.probs[[i]][[j]], 1, function(x)
-                                as.list(which(x >= thres))), names)
-                correct <- mapply(function(s, p){
-                    if(s == "reference"){
-                        "reference" %in% p
-                    } else if(s %in% class.types){
-                        length(intersect(p, class.types)) == 1 & s %in% p
-                    } else {
-                        NA
-                    }
-                }, met.pheno$subtype[cv[[i]]], preds)
-                mean(!correct, na.rm=TRUE)
+    # Train classifiers and calculate test set probabilities
+    for(method in names(probs)){
+        if(is.blank(probs[[method]][[i]])){
+            trace.msg(3, "Classifying based on %s feature sets ", method, linebreak=FALSE)
+            
+            if(method == "combined")
+                v <- Reduce("pmax", cv.feat.sel[[i]])
+            probs[[method]][[i]] <- foreach(times.chosen=1:25) %dopar% {
+                my.pred <- lapply(names(y), function(my.class){
+                    idx <- switch(method,
+                        separate = cv.feat.sel[[i]][[my.class]] >= times.chosen,
+                        combined = v >= times.chosen)
+                    if(!any(idx)) return(NULL)
+                    my.met <- met.data[, idx, drop=FALSE]
+                    my.y <- y[[my.class]]
+                    my.y[is.na(my.y) & cv[[i]]] <- levels(my.y)[2]
+                    batch.predict(my.met, my.y, "nsc", cv[i],
+                        pre.trans = pre.impute.median)
+                })
+                names(my.pred) <- names(y)
+                cat(".")
+                if(any(sapply(my.pred, is.null))) return(NA)
+                sapply(my.pred, function(p) p$cv[[1]]$nsc$prob[,1])
             }
-            cat(".")
-            tmp
+            cat("\n")
+            need.save <- TRUE
         }
-        cat("\n")
     }
-
-    # And again using the combined approach
-    if(is.blank(comb.probs[[i]])){
-        trace.msg(3, "Classifying based on combined dataset ", linebreak=FALSE)
-        v <- Reduce("pmax", cv.feat.sel[[i]])
-        comb.probs[[i]] <- foreach(times.chosen=1:25) %dopar% {
-            my.met <- met.data[, v >= times.chosen]
-            my.pred <- lapply(y, function(my.y){
-                my.y[is.na(my.y) & cv[[i]]] <- levels(my.y)[2]
-                batch.predict(my.met, my.y, "nsc", cv[i],
-                    pre.trans = pre.impute.median)
-            })
-            cat(".")
-            if(any(sapply(my.pred, is.null))) return(NULL)
-            sapply(my.pred, function(p) p$cv[[1]]$nsc$prob[,1])
-        }
-        cat("\n")
-    }
-    # Calculate errors
-    if(is.blank(comb.errors[[i]])){
-        trace.msg(3, "Calculating errors ", linebreak=FALSE)
-        comb.errors[[i]] <- foreach(j = 1:25, .combine=cbind) %dopar% {
-            if(is.blank(comb.probs[[i]][[j]])) return(NA)
-            tmp <- foreach(thres = thres.axs, .combine=c) %do% {
-                if(is.null(comb.probs[[i]][[j]])) return(NA)
-                preds <- lapply(apply(comb.probs[[i]][[j]], 1, function(x)
-                                as.list(which(x >= thres))), names)
-                correct <- mapply(function(s, p){
-                    if(s == "reference"){
-                        "reference" %in% p
-                    } else if(s %in% class.types){
-                        length(intersect(p, class.types)) == 1 & s %in% p
-                    } else {
-                        NA
-                    }
-                }, met.pheno$subtype[cv[[i]]], preds)
-                mean(!correct, na.rm=TRUE)
-            }
-            cat(".")
-            tmp
-        }
-        cat("\n")
-    }
-
-    save.assembly()
+    if(need.save) save.assembly()
 }
 
 
-#   At this point we found that there was only marginal difference in
-#   performance between the different models and choices of parameters (unless
-#   `thres` is far from 0.5). The best model turned out to be feature selection
-#   based on a 14-fold overlap and a classification threshold of 0.47.
+trace.msg(1, "Evaluating performance and tuning parameters")
+truth <- sapply(y, function(my.y) as.integer(my.y) == 1)
+truth[y$reference %in% "reference", 2:9] <- FALSE
+
+for(method in names(error)){
+    trace.msg(2, "Evaluating performance of the %s method", method, linebreak=FALSE)
+    for(i in seq_along(cv)){
+        for(times.chosen in seq_along(cv)){
+            if(!is.blank(probs[[method]][[i]][[times.chosen]])){
+
+                # Call classes from probability estimates
+                p <- probs[[method]][[i]][[times.chosen]] >= .5
+                # Subtype classification is irrelevant when classed as reference
+                p[p[,1],2:9] <- FALSE
+                # Samples of unknown classes can not be part of subtype performance evaluation
+                p[is.na(truth[cv[[i]],1]), 1:9] <- NA
+                # Sex does not apply for purified reference samples, e.g. CD19+
+                p[is.na(truth[cv[[i]],"sex"]), "sex"] <- NA 
+
+                correct <- p == truth[cv[[i]],]
+                sens.spec <- mapply(tapply, as.data.frame(correct), y[cv[[i]],], MoreArgs=list(mean))
+                ppv.npv <- mapply(tapply, as.data.frame(correct),
+                                  lapply(as.data.frame(p), factor, levels=c(TRUE, FALSE)),
+                                  MoreArgs=list(mean))
+
+                error[[method]][i, times.chosen] <- mean(!apply(correct[,1:9], 1, all, na.rm=TRUE)[
+                                                             !apply(is.na(correct[,1:9]), 1, all)])
+                error.sex[[method]][i, times.chosen] <- mean(!correct[,10], na.rm=TRUE)
+                sens[[method]][, i, times.chosen] <- sens.spec[1,]
+                spec[[method]][, i, times.chosen] <- sens.spec[2,]
+                ppv[[method]][, i, times.chosen] <- ppv.npv[1,]
+                npv[[method]][, i, times.chosen] <- ppv.npv[2,]
+            }
+        }
+        cat(".")
+    }
+    cat("\n")
+}
+save.assembly()
 
 
 #===============================================================================
@@ -169,6 +150,8 @@ for(i in seq_along(cv)){
 #   This section took about 8 h to run, so we decided not to bother with
 #   parallelization.
 #-------------------------------------------------------------------------------
+
+times.chosen <- 11
 
 #-------------------------------o
 #   Select sites for each class
@@ -192,7 +175,7 @@ if(any(sapply(feat.sel, is.null)))
 
 cons.sites <- do.call(rbind, lapply(names(y), function(my.class){
     data.frame(Subtype = my.class,
-               TargetID = met.annot$TargetID[feat.sel[[my.class]] >= 14],
+               TargetID = met.annot$TargetID[feat.sel[[my.class]] >= times.chosen],
                stringsAsFactors=FALSE)
 }))
 write.table(cons.sites, "results/consensus_sites.csv", quote=FALSE, sep="\t",
@@ -204,7 +187,7 @@ write.table(cons.sites, "results/consensus_sites.csv", quote=FALSE, sep="\t",
 
 cons.met <- impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
                        distmat="auto")
-for(my.class in names(y)[sapply(cons, is.null)]){
+for(my.class in names(y)){
     cat("Making final classifier for", my.class, "\n")
     idx <- !is.na(y[[my.class]])
     cons[[my.class]] <- design("nsc", cons.met[idx,], y[[my.class]][idx])
@@ -239,4 +222,10 @@ val.pred <- data.frame(val.pheno,
 write.table(val.pred, "results/validation_predictions.csv",
     quote=FALSE, sep="\t", row.names=FALSE)
 
-
+pal <- c(reference="black", analyse450k::pal("subtype"))
+pal <- pal[match(gsub("\\W", "", names(y)[-10]), names(pal))]
+plot.data <- data.frame(Sample=val.pred$ID, stack(val.pred[9:17]))
+plot.data$ind <- factor(as.character(plot.data$ind)
+    names(y)[match(gsub("\\W", "", levels(plot.data$ind)),
+                   gsub("\\W", "", names(y)))]
+barchart(ind ~ values | Sample, plot.data, as.table=TRUE, col=pal)

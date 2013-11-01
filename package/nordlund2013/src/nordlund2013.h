@@ -1,5 +1,5 @@
-#ifndef _nordlund2014_NORDLUND2014_H
-#define _nordlund2014_NORDLUND2014_H
+#ifndef _nordlund2013_NORDLUND2013_H
+#define _nordlund2013_NORDLUND2013_H
 
 #include <stdlib.h>
 #include <R.h>

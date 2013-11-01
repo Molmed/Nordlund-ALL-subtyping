@@ -32,7 +32,7 @@ tryCatch({
 
     library(pamr)
     library(predict)
-    library(nordlund2014)
+    library(nordlund2013)
 }, error=function(...)
     cat("Could not setup analysis environment. Did you run `setup.R` first?\n"))
 
