@@ -10,9 +10,17 @@
 #-------------------------------------------------------------------------------
 
 source("analyze_init.R")
+number.of.cores <- 3
 
-library(doMC)
-registerDoMC(3)
+# If we run on the UPPMAX cluster, maximize the number of processes
+if(grepl("^q\\d+\\.uppmax\\.uu\\.se$", Sys.info()["nodename"])){
+    max.mem <- as.integer(sub("^MemTotal:\\s+(\\d+) kB$", "\\1",
+        system("head /proc/meminfo -n 1", intern=TRUE)))
+    number.of.cores <- floor(max.mem/13)
+}
+
+library(parallel)
+options(mc.cores = number.of.cores)
 
 
 #===============================================================================
@@ -47,24 +55,33 @@ if(file.exists(out.file)){
     sens <- spec <- ppv <- npv <-
         list(separate = array(NA, c(length(y), length(cv), length(cv))),
              combined = array(NA, c(length(y), length(cv), length(cv))))
+    n.sites <- array(NA, c(length(y), length(cv), length(cv)))
 }
 cv.feat.sel <- vector("list", length(cv))
 save.assembly <- function()
-    save(probs, error, error.sex, sens, spec, ppv, npv, file=out.file)
+    save(probs, error, error.sex, sens, spec, ppv, npv, n.sites, file=out.file)
 
 trace.msg(1, "Confirming that the tuning has completed", linebreak=FALSE)
 for(i in seq_along(cv)){
     tryCatch({
         load(sprintf("tuning/fold_%i.Rdata", i))
-        stopifnot(!any(sapply(fold.feat.sel, is.blank)))
+        fold.idx <- sapply(fold.feat.sel, is.blank)
+        stopifnot(!any(fold.idx))
         cv.feat.sel[[i]] <- fold.feat.sel
         rm(fold.feat.sel)
     }, error=function(err){
-        stop("Model tuning has not completed successfully.")
+        stop(sprintf("Model tuning has not completed successfully, please rerun fold %i %s.",
+                     i, paste(names(y)[fold.idx], collapse=", ")))
     })
+    n.sites[,i,] <- t(sapply(cv.feat.sel[[i]], function(x)
+            rev(cumsum(rev(unname(table(cut(x, 0:25))))))))
     cat(".")
 }
 cat("\n")
+save.assembly()
+#save(cv.feat.sel, file="results/cv_feat_sel.Rdata")
+#load("results/cv_feat_sel.Rdata")
+
 
 trace.msg(1, "Fitting classifiers and predicting test sets classes")
 for(i in seq_along(cv)){
@@ -78,8 +95,9 @@ for(i in seq_along(cv)){
             
             if(method == "combined")
                 v <- Reduce("pmax", cv.feat.sel[[i]])
-            probs[[method]][[i]] <- foreach(times.chosen=1:25) %dopar% {
-                my.pred <- lapply(names(y), function(my.class){
+            probs[[method]][[i]] <- vector("list", 25)
+            for(times.chosen in 1:25){
+                my.pred <- mclapply(names(y), function(my.class){
                     idx <- switch(method,
                         separate = cv.feat.sel[[i]][[my.class]] >= times.chosen,
                         combined = v >= times.chosen)
@@ -92,8 +110,11 @@ for(i in seq_along(cv)){
                 })
                 names(my.pred) <- names(y)
                 cat(".")
-                if(any(sapply(my.pred, is.null))) return(NA)
-                sapply(my.pred, function(p) p$cv[[1]]$nsc$prob[,1])
+                probs[[method]][[i]][[times.chosen]] <- if(any(sapply(my.pred, is.null))){
+                    NA
+                } else {
+                    sapply(my.pred, function(p) p$cv[[1]]$nsc$prob[,1])
+                }
             }
             cat("\n")
             need.save <- TRUE
@@ -151,7 +172,11 @@ save.assembly()
 #   parallelization.
 #-------------------------------------------------------------------------------
 
-times.chosen <- 11
+#merr <- sapply(error, apply, 2, mean)
+#which(merr == min(merr, na.rm=TRUE), arr.ind=TRUE)
+
+times.chosen <- 19
+
 
 #-------------------------------o
 #   Select sites for each class
@@ -178,7 +203,7 @@ cons.sites <- do.call(rbind, lapply(names(y), function(my.class){
                TargetID = met.annot$TargetID[feat.sel[[my.class]] >= times.chosen],
                stringsAsFactors=FALSE)
 }))
-write.table(cons.sites, "results/consensus_sites.csv", quote=FALSE, sep="\t",
+write.table(cons.sites, "results/consensus_sites.csv", quote=FALSE, sep=",",
             row.names=FALSE)
 
 
@@ -204,7 +229,7 @@ cons.pred <- data.frame(met.pheno,
     lapply(pred, function(p) p$prob[,1]))
 names(cons.pred)[ncol(cons.pred)] <- "sex.female"
 write.table(cons.pred, "results/consensus_predictions.csv",
-    quote=FALSE, sep="\t", row.names=FALSE)
+    quote=FALSE, sep=",", row.names=FALSE)
 
 
 #-------------------------------o
@@ -213,19 +238,34 @@ write.table(cons.pred, "results/consensus_predictions.csv",
 
 library(analyse450k)
 load.450k.data("subtype_validation", complete=TRUE)
+val.met <- t(val.met[site.idx,])
 
-val.cons <- impute.knn(t(val.met[met.annot$TargetID %in% cons.sites$TargetID,]),
+val.cons <- impute.knn(val.met[,met.annot$TargetID %in% cons.sites$TargetID],
                        distmat="auto")
 val.pred <- data.frame(val.pheno,
-    lapply(cons, function(fit) predict(fit, val.cons)$prob[,1]))
+    lapply(cons, function(fit) predict(fit, val.cons)$prob[,1]),
+    check.names=FALSE)
 
 write.table(val.pred, "results/validation_predictions.csv",
-    quote=FALSE, sep="\t", row.names=FALSE)
+    quote=FALSE, sep=",", row.names=FALSE)
 
-pal <- c(reference="black", analyse450k::pal("subtype"))
-pal <- pal[match(gsub("\\W", "", names(y)[-10]), names(pal))]
-plot.data <- data.frame(Sample=val.pred$ID, stack(val.pred[9:17]))
-plot.data$ind <- factor(as.character(plot.data$ind)
-    names(y)[match(gsub("\\W", "", levels(plot.data$ind)),
-                   gsub("\\W", "", names(y)))]
-barchart(ind ~ values | Sample, plot.data, as.table=TRUE, col=pal)
+save.workspace()
+
+
+#===============================================================================
+#   Make a summary table
+#-------------------------------------------------------------------------------
+
+write.table(
+    data.frame(
+        subtype = names(y),
+        sens.mean = apply(sens$combined[,,times.chosen], 1, mean),
+        sens.sd   = apply(sens$combined[,,times.chosen], 1, sd),
+        spec.mean = apply(spec$combined[,,times.chosen], 1, mean),
+        spec.sd   = apply(sens$combined[,,times.chosen], 1, sd),
+        n.min     = apply(n.sites[,,times.chosen], 1, min),
+        n.max     = apply(n.sites[,,times.chosen], 1, max),
+        n.cc      = sapply(feat.sel, function(x) sum(x >= times.chosen))),
+    file="results/sens_spec_table.csv", sep=",", row.names=FALSE)
+
+

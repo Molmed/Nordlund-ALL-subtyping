@@ -24,22 +24,24 @@
 #-------------------------------------------------------------------------------
 
 tryCatch({
-    setwd("data")
-    if(!exists("met.data"))  load("methylation.Rdata")
-    if(!exists("met.annot")) load("annotations.Rdata")
-    if(!exists("met.pheno")) load("phenotypes.Rdata")
-    setwd("..")
-
     library(pamr)
     library(predict)
     library(nordlund2013)
+
+    load("data/methylation.Rdata")
+    load("data/annotations.Rdata")
+    load("data/phenotypes.Rdata")
+
+    # Remove sample not used in the study
+    # and sites that did not pass quality control
+    sample.idx <- !is.na(met.pheno$subtype) & !grepl("rep[2-9]$", met.pheno$id)
+    site.idx <- met.annot$analyzed
+        # ^^^ needs to be saved as a separate variable since we need it later
+    met.pheno <- met.pheno[sample.idx,]
+    met.data <- t(met.data[site.idx, sample.idx])
+    met.annot <- met.annot[site.idx,]
 }, error=function(...)
     cat("Could not setup analysis environment. Did you run `setup.R` first?\n"))
-
-# Remove sample not used in the study
-sample.idx <- !is.na(met.pheno$subtype) & !grepl("rep[2-9]$", met.pheno$id)
-met.pheno <- met.pheno[sample.idx,]
-met.data <- t(met.data[,sample.idx])
 
 
 #===============================================================================
@@ -80,14 +82,14 @@ if(file.exists("results/pred.Rdata")){
     cv <- resample.crossval(tmp, nfold=5, nrep=5)
     inner.cv <- lapply(cv, function(idx) resample.crossval(tmp, 5, 5, subset=!idx))
     rm(tmp)
-
     feat.sel <- cons <- structure(vector("list", ncol(y)), names=names(y))
-    pred <- NULL
     
     save.workspace <- function(){
-        save(sample.idx, y, cv, inner.cv, class.types, known.types, unknown.types,
-             feat.sel, cons, pred, save.workspace,
-             file="results/pred.Rdata")
+        obj <- c("sample.idx", "y", "cv", "inner.cv",
+            "class.types", "known.types", "unknown.types",
+            "feat.sel", "cons.sites", "cons", "pred", "cons.pred",
+            "val.pred", "save.workspace")
+        save(list=obj[sapply(obj, exists)], file="results/pred.Rdata")
     }
     save.workspace()
     detach(met.pheno)

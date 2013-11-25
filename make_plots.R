@@ -4,6 +4,7 @@
 #   Supplementary figure 3
 #-------------------------------------------------------------------------------
 
+library(nordlund2013)
 load("results/tuning.Rdata")
 
 qfun <- function(x) tryCatch(quantile(x, c(.1, .9)), error=function(...) c(NA, NA))
@@ -18,12 +19,12 @@ class.labels <- sub("^ref", "Ref", sub("^sex", "Sex",
 
 
 pdf("results/S3_tuning.pdf", 14/cm(1), 12/cm(1))
+m <- .5
 pars <- list(ps=8, tcl=-.3, mar=c(3,3,m,m), cex=1)
 pal <- c("blue", "red")
 xd <- .75
 xf <- cumsum(c(0, 1.5, 1,1,1,1)); xf <- xf/tail(xf, 1)
 yf <- cumsum(c(0, 1.5, 1)); yf <- c(yf/tail(yf, 1)/2, 1)
-m <- .5
 screens <- split.screen(cbind(
      left = c(0, xd, xf[c(1:5,1:5)]),
      right = c(xd, 1, xf[c(2:6,2:6)]),
@@ -92,7 +93,7 @@ plot.data <- data.frame(
 names(plot.data)[2:3] <- c("Probability", "Class")
 plot.data$Class <- factor(as.character(plot.data$Class), levels=rev(names(y)),
                         labels=c("Sex", names(pal)))
-plot.data <- plot.data[order(plot.data$Sample),]                    
+plot.data <- plot.data[order(plot.data$Sample),]
 sexes <- with(plot.data, Probability[Class == "Sex"])
 sexes <- sprintf("%s %3.0f%%", ifelse(sexes > .5, "Female", "Male"),
                  100*ifelse(sexes > .5, sexes, 1 - sexes))

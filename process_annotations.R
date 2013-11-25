@@ -29,5 +29,13 @@ met.annot$CHROMOSOME_36 <- factor(met.annot$CHROMOSOME_36,
     levels=c(levels(met.annot$CHR), "MULTI"))
 met.annot[16:38] <- lapply(met.annot[16:38], as.logical)
 
+# The existing dataset on GEO does not include BWA result for the X chromosome
+# Update it from the csv-file in the git repo
+bwa.X <- read.csv("data/bwa_hits_x.csv", colClasses=c("character", "integer"))
+met.annot$bwa.multi.hit[match(bwa.X$TargetID, met.annot$TargetID)] <-
+    as.logical(bwa.X$bwa.multi.hit)
+met.annot$analysed <-
+    with(met.annot, !snp.hit & !bwa.multi.hit & CHR %in% c(1:22, "X"))
+
 save(met.annot, file="data/annotations.Rdata")
 

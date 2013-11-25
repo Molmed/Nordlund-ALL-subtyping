@@ -542,7 +542,7 @@ ALL_636	t(12;21)	male
 ALL_649	T-ALL	male
 ALL_637	HeH	female
 ALL_724	HeH	male
-ALL_740	no result	male
+ALL_740	normal	male
 ALL_736	T-ALL	female
 ALL_678	t(12;21)	female
 ALL_729	T-ALL	male
@@ -573,7 +573,7 @@ ALL_683	t(1;19)	female
 ALL_744	T-ALL	female
 ALL_684	t(12;21)	male
 ALL_685	other	male
-ALL_730	no result	male
+ALL_730	other	male
 ALL_726	HeH	female
 ALL_750	normal	female
 ALL_686	normal	female
@@ -686,7 +686,7 @@ ALL_758	t(12;21)	female
 ALL_757	other	male
 ALL_759	t(12;21)	female
 ALL_760	t(12;21)	male
-ALL_761	no result	male
+ALL_761	other	male
 ALL_763	other	male
 ALL_762	other	female
 539_B	reference	NA

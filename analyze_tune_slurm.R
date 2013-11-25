@@ -17,7 +17,7 @@ for(i in seq_along(folds)){
 "#! /bin/bash -l
 #SBATCH -A b2010028
 #SBATCH -p node -N 1
-#SBATCH -t 9:00:00
+#SBATCH -t 1-0:00:00
 #SBATCH --qos=b2010028_4nodes
 #SBATCH -J subtypes
 #SBATCH --output=runcontrol/analyze_tune_%i.out
