@@ -35,11 +35,9 @@ options(mc.cores = number.of.cores)
 #    2. Let all classifiers use all sites selected for any subtype. Varibles
 #       belonging to this approach are named `comb.###` (for combined).
 #
-#   On top this distinction, two modelparameters are also tuned.
-#
-#    1. The number of folds a variable must be selected in to qualify for the
-#       final model (`times.chosen`).
-#    2. The threshold to use for calling a subtype (`thres`).
+#   On top this distinction, a model parameter `times.chosen` is also tuned,
+#   referred to as `F` in the paper. In controls the number of folds a variable
+#   must be selected in to qualify for the final model.
 #
 #-------------------------------------------------------------------------------
 
@@ -52,14 +50,14 @@ if(file.exists(out.file)){
     error <- error.sex <-
         list(separate = matrix(NA, length(cv), length(cv)),
              combined = matrix(NA, length(cv), length(cv)))
-    sens <- spec <- ppv <- npv <-
+    sens <- spec <- ppv <- npv <- sub.error <- 
         list(separate = array(NA, c(length(y), length(cv), length(cv))),
              combined = array(NA, c(length(y), length(cv), length(cv))))
     n.sites <- array(NA, c(length(y), length(cv), length(cv)))
 }
 cv.feat.sel <- vector("list", length(cv))
 save.assembly <- function()
-    save(probs, error, error.sex, sens, spec, ppv, npv, n.sites, file=out.file)
+    save(probs, error, error.sex, sens, spec, ppv, npv, sub.error, n.sites, file=out.file)
 
 trace.msg(1, "Confirming that the tuning has completed", linebreak=FALSE)
 for(i in seq_along(cv)){
@@ -98,14 +96,20 @@ for(i in seq_along(cv)){
             probs[[method]][[i]] <- vector("list", 25)
             for(times.chosen in 1:25){
                 my.pred <- mclapply(names(y), function(my.class){
-                    idx <- switch(method,
+                    my.site.idx <- switch(method,
                         separate = cv.feat.sel[[i]][[my.class]] >= times.chosen,
                         combined = v >= times.chosen)
-                    if(!any(idx)) return(NULL)
-                    my.met <- met.data[, idx, drop=FALSE]
-                    my.y <- y[[my.class]]
-                    my.y[is.na(my.y) & cv[[i]]] <- levels(my.y)[2]
-                    batch.predict(my.met, my.y, "nsc", cv[i],
+                    if(!any(my.site.idx)) return(NULL)
+                    my.sample.idx <- cv[[i]] | !is.na(y[[my.class]])
+
+                    my.met <- met.data[my.sample.idx, my.site.idx, drop=FALSE]
+                    my.y <- y[[my.class]][my.sample.idx]
+                    my.y <- na.fill(my.y, levels(my.y)[2])
+                    my.cv <- list(outer = cv[my.sample.idx,][i],
+                                  inner = inner.cv[[i]][my.sample.idx & !cv[[i]],])
+                    batch.predict(my.met, my.y,
+                        models = list(nsc=list(cv=list(my.cv$inner))),
+                        test.subset = my.cv$outer,
                         pre.trans = pre.impute.median)
                 })
                 names(my.pred) <- names(y)
@@ -148,6 +152,9 @@ for(method in names(error)){
                 ppv.npv <- mapply(tapply, as.data.frame(correct),
                                   lapply(as.data.frame(p), factor, levels=c(TRUE, FALSE)),
                                   MoreArgs=list(mean))
+                sub.error[[method]][, i, times.chosen] <- mapply(function(yt, yh){
+                    mean(as.integer(yt) != (2-yh), na.rm=TRUE)
+                }, y[cv[[i]],], as.data.frame(p))
 
                 error[[method]][i, times.chosen] <- mean(!apply(correct[,1:9], 1, all, na.rm=TRUE)[
                                                              !apply(is.na(correct[,1:9]), 1, all)])
@@ -175,7 +182,7 @@ save.assembly()
 #merr <- sapply(error, apply, 2, mean)
 #which(merr == min(merr, na.rm=TRUE), arr.ind=TRUE)
 
-times.chosen <- 19
+times.chosen <- 18
 
 
 #-------------------------------o
@@ -210,12 +217,20 @@ write.table(cons.sites, "results/consensus_sites.csv", quote=FALSE, sep=",",
 #-------------------------------o
 #   Train consensus classifiers
 
-cons.met <- impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
-                       distmat="auto")
-for(my.class in names(y)){
-    cat("Making final classifier for", my.class, "\n")
-    idx <- !is.na(y[[my.class]])
-    cons[[my.class]] <- design("nsc", cons.met[idx,], y[[my.class]][idx])
+cons.met <- list(
+    impute.knn(met.data[, met.annot$TargetID %in% cons.sites$TargetID &
+                          met.annot$CHR %in% 1:22], distmat="auto"),
+    impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
+               distmat="auto"))
+cons <- vector("list", 6)
+for(i in 1:6){
+    cons[[i]] <- list()
+    for(my.class in names(y)){
+        cat("Making final classifier for", my.class, "\n")
+        idx <- !is.na(y[[my.class]])
+        cons[[i]][[my.class]] <- design("nsc",
+            cons.met[[1+(my.class == "sex")]][idx,], y[[my.class]][idx])
+    }
 }
 
 
@@ -223,7 +238,9 @@ for(my.class in names(y)){
 #   Predict class probabilities of all samples based on the selected sites,
 #   including the samples used for training.
 
-pred <- lapply(cons, predict, cons.met)
+pred <- lapply(cons, function(cons)
+    mapply(predict, cons, cons.met[c(rep(1,9),2)], SIMPLIFY=FALSE)
+)
 save.workspace()
 cons.pred <- data.frame(met.pheno,
     lapply(pred, function(p) p$prob[,1]))
@@ -240,10 +257,15 @@ library(analyse450k)
 load.450k.data("subtype_validation", complete=TRUE)
 val.met <- t(val.met[site.idx,])
 
-val.cons <- impute.knn(val.met[,met.annot$TargetID %in% cons.sites$TargetID],
-                       distmat="auto")
+val.cons <- list(
+    impute.knn(val.met[, met.annot$TargetID %in% cons.sites$TargetID &
+                         met.annot$CHR %in% 1:22], distmat="auto"),
+    impute.knn(val.met[, met.annot$TargetID %in% cons.sites$TargetID],
+               distmat="auto"))
+
 val.pred <- data.frame(val.pheno,
-    lapply(cons, function(fit) predict(fit, val.cons)$prob[,1]),
+    mapply(function(fit, dat) predict(fit, dat)$prob[,1],
+           cons, val.cons[c(rep(1,9), 2)], SIMPLIFY=FALSE),
     check.names=FALSE)
 
 write.table(val.pred, "results/validation_predictions.csv",

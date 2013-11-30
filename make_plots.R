@@ -46,7 +46,7 @@ mtext("Error rate", 2, 2.2)
 screen(screens[2])
 par(mar=c(m,m,m,m))
 blank.plot()
-legend("top", c("Separate", "Combined", "", "Upper:", "80% CI", "", "Lower:", "PPV", "NPV"),
+legend("top", c("Separate", "Combined", "", "Upper panel:", "80% CI", "", "Lower panels:", "PPV", "NPV"),
     lty=c(1,1,NA,NA,2,NA,NA,1:2), col=c(pal,NA,NA,"black",NA,NA,"black", "black"),
     xpd=TRUE, bty="n")
 
@@ -65,8 +65,8 @@ for(i in 1:10){
         mtext("F", 1, 1.5)
     }
     if((i-1) %% 5 == 0){
-        nice.axis(2, mgp=c(2,.6,0))
-        mtext("PPV / NPV", 2, 2.2)
+        nice.axis(2, at=7:10/10, mgp=c(2,.6,0))
+        mtext("PPV, NPV", 2, 2.2)
     }
     nice.box()
     mtext(class.labels[i], 3, .1)
@@ -74,6 +74,36 @@ for(i in 1:10){
 close.screen(all=TRUE)
 dev.off()
 
+
+#===============================================================================
+#   Subtype-specific error rates
+#-------------------------------------------------------------------------------
+
+sub.mean <- lapply(sub.error, apply, c(1,3), mean, na.rm=TRUE)
+null.err <- sapply(y, function(x) min(prop.table(table(x))))
+
+pdf("results/subtype_specific_error.pdf", 14/cm(1), 6/cm(1))
+layout(matrix(1:10, 2, byrow=TRUE))
+m <- .5
+par(ps=8, tcl=-.3, mar=c(m,m,1,m), oma=c(2,2.5,0,0), cex=1)
+for(i in 1:10){
+    blank.plot(c(1,25), c(0,0), ylim=c(0, null.err[i]*1.1))
+    hlines(null.err[i], col="#cccccc", lty=1)
+    my.err <- sapply(sub.mean, "[", i, T)
+    matplot(my.err, type="l", col=pal, lty=1, add=TRUE)
+    points(apply(my.err, 2, which.min), apply(my.err, 2, min), col=pal)
+    if(i > 5){
+        nice.axis(1, at=c(1, 1:5*5), mgp=c(2,.4,0))
+        mtext("F", 1, 1.5)
+    }
+    if((i-1) %% 5 == 0){
+        nice.axis(2, mgp=c(2,.6,0))
+        mtext("Error rate", 2, 2.2)
+    }
+    nice.box()
+    mtext(class.labels[i], 3, .1)
+}
+dev.off()
 
 
 #===============================================================================
