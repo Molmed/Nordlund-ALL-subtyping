@@ -7,8 +7,8 @@
 library(nordlund2013)
 load("results/tuning.Rdata")
 
-qfun <- function(x) tryCatch(quantile(x, c(.1, .9)), error=function(...) c(NA, NA))
-error.mean <- sapply(error, apply, 2, mean)
+qfun <- function(x) tryCatch(quantile(x, c(.1, .9), na.rm=TRUE), error=function(...) c(NA, NA))
+error.mean <- sapply(error, apply, 2, mean, na.rm=TRUE)
 error.mean.min <- min(error.mean, na.rm=TRUE)
 error.quantile <- lapply(error, apply, 2, qfun)
 ppv.mean <- lapply(ppv, apply, c(1,3), mean, na.rm=TRUE)
@@ -140,4 +140,11 @@ print(barchart(Class ~ Probability | Sample, plot.data, subset = Class != "Sex",
         panel.text(1.04, 1, sexes[counter], adj=c(1,.5))
     }))
 dev.off()
+
+
+#===============================================================================
+#   Kladd
+#-------------------------------------------------------------------------------
+
+i
 

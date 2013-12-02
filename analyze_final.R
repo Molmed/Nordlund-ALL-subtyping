@@ -16,7 +16,7 @@ number.of.cores <- 3
 if(grepl("^q\\d+\\.uppmax\\.uu\\.se$", Sys.info()["nodename"])){
     max.mem <- as.integer(sub("^MemTotal:\\s+(\\d+) kB$", "\\1",
         system("head /proc/meminfo -n 1", intern=TRUE)))
-    number.of.cores <- floor(max.mem/13)
+    number.of.cores <- floor(max.mem/12e6)
 }
 
 library(parallel)
@@ -63,7 +63,7 @@ trace.msg(1, "Confirming that the tuning has completed", linebreak=FALSE)
 for(i in seq_along(cv)){
     tryCatch({
         load(sprintf("tuning/fold_%i.Rdata", i))
-        fold.idx <- sapply(fold.feat.sel, is.blank)
+        fold.idx <- sapply(fold.feat.sel, is.null)
         stopifnot(!any(fold.idx))
         cv.feat.sel[[i]] <- fold.feat.sel
         rm(fold.feat.sel)
@@ -99,7 +99,7 @@ for(i in seq_along(cv)){
                     my.site.idx <- switch(method,
                         separate = cv.feat.sel[[i]][[my.class]] >= times.chosen,
                         combined = v >= times.chosen)
-                    if(!any(my.site.idx)) return(NULL)
+                    if(!any(my.site.idx) | sum(my.site.idx) > 5000) return(NULL)
                     my.sample.idx <- cv[[i]] | !is.na(y[[my.class]])
 
                     my.met <- met.data[my.sample.idx, my.site.idx, drop=FALSE]
@@ -182,7 +182,7 @@ save.assembly()
 #merr <- sapply(error, apply, 2, mean)
 #which(merr == min(merr, na.rm=TRUE), arr.ind=TRUE)
 
-times.chosen <- 18
+times.chosen <- 20
 
 
 #-------------------------------o
@@ -222,15 +222,12 @@ cons.met <- list(
                           met.annot$CHR %in% 1:22], distmat="auto"),
     impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
                distmat="auto"))
-cons <- vector("list", 6)
-for(i in 1:6){
-    cons[[i]] <- list()
-    for(my.class in names(y)){
-        cat("Making final classifier for", my.class, "\n")
-        idx <- !is.na(y[[my.class]])
-        cons[[i]][[my.class]] <- design("nsc",
-            cons.met[[1+(my.class == "sex")]][idx,], y[[my.class]][idx])
-    }
+for(my.class in names(y)){
+    cat("Making final classifier for", my.class, "\n")
+    idx <- !is.na(y[[my.class]])
+    cons[[my.class]] <- design("nsc",
+        cons.met[[1+(my.class == "sex")]][idx,], y[[my.class]][idx],
+        cv = cv[idx,])
 }
 
 
@@ -238,10 +235,9 @@ for(i in 1:6){
 #   Predict class probabilities of all samples based on the selected sites,
 #   including the samples used for training.
 
-pred <- lapply(cons, function(cons)
-    mapply(predict, cons, cons.met[c(rep(1,9),2)], SIMPLIFY=FALSE)
-)
+pred <- mapply(predict, cons, cons.met[c(rep(1,9),2)], SIMPLIFY=FALSE)
 save.workspace()
+
 cons.pred <- data.frame(met.pheno,
     lapply(pred, function(p) p$prob[,1]))
 names(cons.pred)[ncol(cons.pred)] <- "sex.female"
