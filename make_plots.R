@@ -8,8 +8,8 @@ library(nordlund2013)
 load("results/tuning.Rdata")
 
 qfun <- function(x) tryCatch(quantile(x, c(.1, .9), na.rm=TRUE), error=function(...) c(NA, NA))
-error.mean <- sapply(error, apply, 2, mean, na.rm=TRUE)
-error.mean.min <- min(error.mean, na.rm=TRUE)
+error.mean <- sapply(error, apply, 2, mean)
+error.mean.min <- min(error.mean)
 error.quantile <- lapply(error, apply, 2, qfun)
 ppv.mean <- lapply(ppv, apply, c(1,3), mean, na.rm=TRUE)
 npv.mean <- lapply(npv, apply, c(1,3), mean, na.rm=TRUE)
@@ -65,7 +65,7 @@ for(i in 1:10){
         mtext("F", 1, 1.5)
     }
     if((i-1) %% 5 == 0){
-        nice.axis(2, at=7:10/10, mgp=c(2,.6,0))
+        nice.axis(2, mgp=c(2,.6,0))
         mtext("PPV, NPV", 2, 2.2)
     }
     nice.box()
@@ -143,8 +143,21 @@ dev.off()
 
 
 #===============================================================================
-#   Kladd
+#   Plot auto-predictions of the final classifier
 #-------------------------------------------------------------------------------
 
-i
+x <- cons.pred[11:20]
+x[cons.pred$subtype %in% "reference", 2:9] <- NA
+
+pdf("results/auto_predictions.pdf", 8/cm(1), 8/cm(1))
+par(mar=c(2, 3.5, .5, .5), ps=8)
+blank.plot(ylim=c(.5,10.5), xlim=0:1)
+segments(.5, -10, .5, 100, col="#cccccc")
+points(unlist(x),
+       jitter(rep(10:1, each=nrow(cons.pred)), amount=.25),
+       cex=.75, col=c("#ff000033", "#00000033")[sapply(y, as.integer)])
+mtext(c("Reference", names(y)[2:9], "Female"), 2, .3, at=10:1, las=1)
+nice.axis(1)
+nice.box()
+dev.off()
 

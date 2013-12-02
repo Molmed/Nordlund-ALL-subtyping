@@ -99,17 +99,15 @@ for(i in seq_along(cv)){
                     my.site.idx <- switch(method,
                         separate = cv.feat.sel[[i]][[my.class]] >= times.chosen,
                         combined = v >= times.chosen)
-                    if(!any(my.site.idx) | sum(my.site.idx) > 5000) return(NULL)
+                    if(!any(my.site.idx)) return(NULL)
                     my.sample.idx <- cv[[i]] | !is.na(y[[my.class]])
 
                     my.met <- met.data[my.sample.idx, my.site.idx, drop=FALSE]
                     my.y <- y[[my.class]][my.sample.idx]
                     my.y <- na.fill(my.y, levels(my.y)[2])
-                    my.cv <- list(outer = cv[my.sample.idx,][i],
-                                  inner = inner.cv[[i]][my.sample.idx & !cv[[i]],])
                     batch.predict(my.met, my.y,
-                        models = list(nsc=list(cv=list(my.cv$inner))),
-                        test.subset = my.cv$outer,
+                        models = list(nsc=list(threshold=list(0), cv=list(NULL))),
+                        test.subset = cv[my.sample.idx,][i],
                         pre.trans = pre.impute.median)
                 })
                 names(my.pred) <- names(y)
@@ -133,7 +131,7 @@ truth <- sapply(y, function(my.y) as.integer(my.y) == 1)
 truth[y$reference %in% "reference", 2:9] <- FALSE
 
 for(method in names(error)){
-    trace.msg(2, "Evaluating performance of the %s method", method, linebreak=FALSE)
+    trace.msg(2, "Evaluating performance of the %s method ", method, linebreak=FALSE)
     for(i in seq_along(cv)){
         for(times.chosen in seq_along(cv)){
             if(!is.blank(probs[[method]][[i]][[times.chosen]])){
@@ -182,7 +180,7 @@ save.assembly()
 #merr <- sapply(error, apply, 2, mean)
 #which(merr == min(merr, na.rm=TRUE), arr.ind=TRUE)
 
-times.chosen <- 20
+times.chosen <- 21
 
 
 #-------------------------------o
@@ -206,7 +204,7 @@ if(any(sapply(feat.sel, is.null)))
 #   Output a summary of the selected sites
 
 cons.sites <- do.call(rbind, lapply(names(y), function(my.class){
-    data.frame(Subtype = my.class,
+    data.frame(Subtype = factor(my.class, levels=names(y)),
                TargetID = met.annot$TargetID[feat.sel[[my.class]] >= times.chosen],
                stringsAsFactors=FALSE)
 }))
@@ -217,17 +215,21 @@ write.table(cons.sites, "results/consensus_sites.csv", quote=FALSE, sep=",",
 #-------------------------------o
 #   Train consensus classifiers
 
-cons.met <- list(
-    impute.knn(met.data[, met.annot$TargetID %in% cons.sites$TargetID &
-                          met.annot$CHR %in% 1:22], distmat="auto"),
-    impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
-               distmat="auto"))
+#cons.met <- list(
+#    impute.knn(met.data[, met.annot$TargetID %in% cons.sites$TargetID &
+#                          met.annot$CHR %in% 1:22], distmat="auto"),
+#    impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
+#               distmat="auto"))
+cons.met <- lapply(with(cons.sites, split(TargetID, Subtype)),
+    function(ids) impute.knn(met.data[,met.annot$TargetID %in% ids], distmat="auto"))
 for(my.class in names(y)){
     cat("Making final classifier for", my.class, "\n")
     idx <- !is.na(y[[my.class]])
     cons[[my.class]] <- design("nsc",
-        cons.met[[1+(my.class == "sex")]][idx,], y[[my.class]][idx],
-        cv = cv[idx,])
+        cons.met[[my.class]][idx,], y[[my.class]][idx],
+        thres = 0, cv = NULL,
+        slim.fit = TRUE)
+    # 8 comes from that there are only 8 confirmed iAMP samples
 }
 
 
@@ -235,7 +237,7 @@ for(my.class in names(y)){
 #   Predict class probabilities of all samples based on the selected sites,
 #   including the samples used for training.
 
-pred <- mapply(predict, cons, cons.met[c(rep(1,9),2)], SIMPLIFY=FALSE)
+pred <- mapply(predict, cons, cons.met, SIMPLIFY=FALSE)
 save.workspace()
 
 cons.pred <- data.frame(met.pheno,
@@ -253,15 +255,17 @@ library(analyse450k)
 load.450k.data("subtype_validation", complete=TRUE)
 val.met <- t(val.met[site.idx,])
 
-val.cons <- list(
-    impute.knn(val.met[, met.annot$TargetID %in% cons.sites$TargetID &
-                         met.annot$CHR %in% 1:22], distmat="auto"),
-    impute.knn(val.met[, met.annot$TargetID %in% cons.sites$TargetID],
-               distmat="auto"))
+#val.cons <- list(
+#    impute.knn(val.met[, met.annot$TargetID %in% cons.sites$TargetID &
+#                         met.annot$CHR %in% 1:22], distmat="auto"),
+#    impute.knn(val.met[, met.annot$TargetID %in% cons.sites$TargetID],
+#               distmat="auto"))
+val.cons <- lapply(with(cons.sites, split(TargetID, Subtype)),
+    function(ids) impute.knn(val.met[,met.annot$TargetID %in% ids], distmat="auto"))
 
 val.pred <- data.frame(val.pheno,
     mapply(function(fit, dat) predict(fit, dat)$prob[,1],
-           cons, val.cons[c(rep(1,9), 2)], SIMPLIFY=FALSE),
+           cons, val.cons, SIMPLIFY=FALSE),
     check.names=FALSE)
 
 write.table(val.pred, "results/validation_predictions.csv",
