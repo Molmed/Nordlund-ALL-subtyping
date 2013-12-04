@@ -38,7 +38,7 @@
 number.of.cores <- 3
 
 # If we run on the UPPMAX cluster, maximize the number of processes
-if(grepl("^q\\d+\\.uppmax\\.uu\\.se$", Sys.info()["nodename"])){
+if(grepl("^[qm]\\d+\\.uppmax\\.uu\\.se$", Sys.info()["nodename"])){
     max.mem <- as.integer(sub("^MemTotal:\\s+(\\d+) kB$", "\\1",
         system("head /proc/meminfo -n 1", intern=TRUE)))
     number.of.cores <- floor(max.mem/13e6)
