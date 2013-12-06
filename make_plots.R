@@ -8,14 +8,14 @@ library(nordlund2013)
 load("results/tuning.Rdata")
 
 qfun <- function(x) tryCatch(quantile(x, c(.1, .9), na.rm=TRUE), error=function(...) c(NA, NA))
-error.mean <- sapply(error, apply, 2, mean)
-error.mean.min <- min(error.mean)
+error.mean <- sapply(error, apply, 2, mean, na.rm=TRUE)
+error.mean.min <- min(error.mean, na.rm=TRUE)
 error.quantile <- lapply(error, apply, 2, qfun)
 ppv.mean <- lapply(ppv, apply, c(1,3), mean, na.rm=TRUE)
 npv.mean <- lapply(npv, apply, c(1,3), mean, na.rm=TRUE)
 ppv.lim <- range(c(unlist(ppv.mean), unlist(npv.mean)))
 class.labels <- sub("^ref", "Ref", sub("^sex", "Sex",
-        colnames(probs$separate[[1]][[1]])))
+        colnames(probs$separate[[11]][[11]])))
 
 
 pdf("results/S3_tuning.pdf", 14/cm(1), 12/cm(1))

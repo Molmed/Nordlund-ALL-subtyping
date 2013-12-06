@@ -10,7 +10,7 @@
 #-------------------------------------------------------------------------------
 
 source("analyze_init.R")
-number.of.cores <- 3
+number.of.cores <- 5
 
 # If we run on the UPPMAX cluster, maximize the number of processes
 if(grepl("^[qm]\\d+\\.uppmax\\.uu\\.se$", Sys.info()["nodename"])){
@@ -77,11 +77,15 @@ for(i in seq_along(cv)){
 }
 cat("\n")
 save.assembly()
-#save(cv.feat.sel, file="results/cv_feat_sel.Rdata")
+#save(cv.feat.sel, n.sites, file="results/cv_feat_sel.Rdata")
 #load("results/cv_feat_sel.Rdata")
 
 
 trace.msg(1, "Fitting classifiers and predicting test sets classes")
+# Overlayer the default predict function with one that discards as few sites
+# as possible, since we already tune complexity with `times.chosen`.
+predict.nsc <- function(...)
+    getFromNamespace("predict.nsc", "predict")(..., thres=min)
 for(i in seq_along(cv)){
     trace.msg(2, "Fold %i", i)
     need.save <- FALSE
@@ -99,14 +103,15 @@ for(i in seq_along(cv)){
                     my.site.idx <- switch(method,
                         separate = cv.feat.sel[[i]][[my.class]] >= times.chosen,
                         combined = v >= times.chosen)
-                    if(!any(my.site.idx)) return(NULL)
+                    if(!any(my.site.idx) || sum(my.site.idx) > 10000) return(NULL)
                     my.sample.idx <- cv[[i]] | !is.na(y[[my.class]])
 
                     my.met <- met.data[my.sample.idx, my.site.idx, drop=FALSE]
                     my.y <- y[[my.class]][my.sample.idx]
                     my.y <- na.fill(my.y, levels(my.y)[2])
                     batch.predict(my.met, my.y,
-                        models = list(nsc=list(threshold=list(0), cv=list(NULL))),
+                        models = list(nsc=list(cv=list(list(nrep=25, nfold=8)))),
+                        # 8 comes from that there are only 8 confirmed iAMP samples
                         test.subset = cv[my.sample.idx,][i],
                         pre.trans = pre.impute.median)
                 })
@@ -124,6 +129,7 @@ for(i in seq_along(cv)){
     }
     if(need.save) save.assembly()
 }
+rm(predict.nsc)
 
 
 trace.msg(1, "Evaluating performance and tuning parameters")
@@ -180,7 +186,7 @@ save.assembly()
 #merr <- sapply(error, apply, 2, mean)
 #which(merr == min(merr, na.rm=TRUE), arr.ind=TRUE)
 
-times.chosen <- 21
+times.chosen <- 17
 
 
 #-------------------------------o
@@ -220,6 +226,14 @@ write.table(cons.sites, "results/consensus_sites.csv", quote=FALSE, sep=",",
 #                          met.annot$CHR %in% 1:22], distmat="auto"),
 #    impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
 #               distmat="auto"))
+#for(my.class in names(y)){
+#    cat("Making final classifier for", my.class, "\n")
+#    idx <- !is.na(y[[my.class]])
+#    cons[[my.class]] <- design("nsc",
+#        cons.met[[if(my.class == "sex") 2 else 1]][idx,], y[[my.class]][idx],
+#        cv = list(nrep=25, nfold=8),
+#        slim.fit = TRUE)
+#}
 cons.met <- lapply(with(cons.sites, split(TargetID, Subtype)),
     function(ids) impute.knn(met.data[,met.annot$TargetID %in% ids], distmat="auto"))
 for(my.class in names(y)){
@@ -227,9 +241,8 @@ for(my.class in names(y)){
     idx <- !is.na(y[[my.class]])
     cons[[my.class]] <- design("nsc",
         cons.met[[my.class]][idx,], y[[my.class]][idx],
-        thres = 0, cv = NULL,
+        thres = 0, cv = list(nrep=25, nfold=8),
         slim.fit = TRUE)
-    # 8 comes from that there are only 8 confirmed iAMP samples
 }
 
 
@@ -237,7 +250,10 @@ for(my.class in names(y)){
 #   Predict class probabilities of all samples based on the selected sites,
 #   including the samples used for training.
 
-pred <- mapply(predict, cons, cons.met, SIMPLIFY=FALSE)
+#pred <- mapply(predict, cons, cons.met[rep(1:2, c(9,1))],
+#               MoreArgs=list(threshold=min), SIMPLIFY=FALSE)
+pred <- mapply(predict, cons, cons.met,
+               MoreArgs=list(threshold=min), SIMPLIFY=FALSE)
 save.workspace()
 
 cons.pred <- data.frame(met.pheno,
@@ -264,8 +280,8 @@ val.cons <- lapply(with(cons.sites, split(TargetID, Subtype)),
     function(ids) impute.knn(val.met[,met.annot$TargetID %in% ids], distmat="auto"))
 
 val.pred <- data.frame(val.pheno,
-    mapply(function(fit, dat) predict(fit, dat)$prob[,1],
-           cons, val.cons, SIMPLIFY=FALSE),
+    mapply(function(fit, dat) predict(fit, dat, threshold=min)$prob[,1],
+           cons, val.cons[rep(1:2, c(9,1))], SIMPLIFY=FALSE),
     check.names=FALSE)
 
 write.table(val.pred, "results/validation_predictions.csv",

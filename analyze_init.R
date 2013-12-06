@@ -121,10 +121,4 @@ design.feature_selection <- function(x, y, chr, cv){
     # 1e-12 for avoiding comparison with exactly 0.
     # Might not be an issue, but doesn't harm.
 }
-neg.gm <- function(true, pred){
-    # The negative geometric mean of the class specific predictive accuracies,
-    # as suggested by Blagus and Lusa (2013).
-    # http://www.biomedcentral.com/1471-2105/14/64
-    -exp(mean(log( tapply(pred$pred == true, true, mean) )))
-}
 
