@@ -10,7 +10,7 @@
 #-------------------------------------------------------------------------------
 
 source("analyze_init.R")
-number.of.cores <- 5
+number.of.cores <- 3
 
 # If we run on the UPPMAX cluster, maximize the number of processes
 if(grepl("^[qm]\\d+\\.uppmax\\.uu\\.se$", Sys.info()["nodename"])){

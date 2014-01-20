@@ -7,7 +7,7 @@
 library(nordlund2013)
 load("results/tuning.Rdata")
 
-qfun <- function(x) tryCatch(quantile(x, c(.1, .9), na.rm=TRUE), error=function(...) c(NA, NA))
+qfun <- function(x, q=0:4/4) tryCatch(quantile(x, q, na.rm=TRUE), error=function(...) c(NA, NA))
 error.mean <- sapply(error, apply, 2, mean, na.rm=TRUE)
 error.mean.min <- min(error.mean, na.rm=TRUE)
 error.quantile <- lapply(error, apply, 2, qfun)
