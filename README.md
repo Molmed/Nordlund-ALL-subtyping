@@ -11,11 +11,11 @@ System requirements
 -------------------
 ### Software
 The code is written for a Unix or Linux operating system with [R](http://r-project.org) version 3.0.1 or later, but can be modified to run under Windows fairly easily. Packages 
-`doMC`,
-[`GEOquery`](http://www.bioconductor.org/packages/2.12/bioc/html/GEOquery.html),
+`doMC` (1.3-0),
+[`GEOquery`](http://www.bioconductor.org/packages/2.12/bioc/html/GEOquery.html) (2.26.2),
 [`pamr`](http://www-stat.stanford.edu/~tibs/PAM/Rdist/doc/readme.html),
-`predict` and 
-[`roxygen2`](http://roxygen.org/), 
+`predict` (2.1-8) and 
+[`roxygen2`](http://roxygen.org/) (2.2.2), 
 are required, but are installed automatically. The `predict` package was developed inhouse and will soon be released on CRAN (manuscript in preparation).
 
 The `analyse450k` package appearing in the end of `analyze_final.R` is an inhouse package for data management, that will not be distributed. Instead, when the manuscript is accepted for publication and the validation dataset is made publicly available on [GEO](http://www.ncbi.nlm.nih.gov/geo/), it will be incorporated into `setup.R`.

@@ -85,7 +85,7 @@ trace.msg(1, "Fitting classifiers and predicting test sets classes")
 # Overlayer the default predict function with one that discards as few sites
 # as possible, since we already tune complexity with `times.chosen`.
 predict.nsc <- function(...)
-    getFromNamespace("predict.nsc", "predict")(..., thres=min)
+    predict:::predict.nsc(..., thres=min)
 for(i in seq_along(cv)){
     trace.msg(2, "Fold %i", i)
     need.save <- FALSE
