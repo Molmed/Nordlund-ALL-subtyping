@@ -17,7 +17,22 @@ ppv.lim <- range(c(unlist(ppv.mean), unlist(npv.mean)))
 class.labels <- sub("^ref", "Ref", sub("^sex", "Sex",
         colnames(probs$separate[[11]][[11]])))
 
+qi <- seq(0, 1, length.out=500)
+library(zoo)
+nk <- function(k, x=c(.025, .975)){
+    if(any(is.na(k))){
+        rep(NA, length(x))
+    } else {
+        p <- cumsum(qi^k[2]*(1-qi)^k[1])
+        p <- p/tail(p,1)
+        approx(p, qi, x)$y
+    }
+}
+ci <- lapply(n.error, apply, 2:3, nk)
+mean.ci <- lapply(ci, apply, c(1,3), mean, na.rm=TRUE)
 
+
+X11(,14/cm(1),12/cm(1))
 pdf("results/S3_tuning.pdf", 14/cm(1), 12/cm(1))
 m <- .5
 pars <- list(ps=8, tcl=-.3, mar=c(3,3,m,m), cex=1)
@@ -33,14 +48,22 @@ screens <- split.screen(cbind(
 
 screen(screens[1])
 do.call(par, pars)
+matplot(1:25, t(error.quantile[[1]]), lty=c(3:1,2:3), type="l", col=pal[1], xlim=range(unlist()
+matplot(1:25, t(error.quantile[[2]]), lty=c(3:1,2:3), type="l", col=pal[2], add=TRUE)
+
 plot(c(0, 100), rep(error.mean.min, 2), type="l", col="#e6e6e6", axes=FALSE, ann=FALSE, bty="n",
-     xlim=c(1,25), ylim=range(c(unlist(error.mean), unlist(error.quantile)), na.rm=TRUE))
+     xlim=c(1,25), ylim=range(c(unlist(error.mean), unlist(mean.ci)), na.rm=TRUE))
 matplot(error.mean, type="l", lty=1, col=pal, add=TRUE)
-for(i in 1:2) matplot(t(error.quantile[[i]]), type="l", lty=2, col=pal[i], add=TRUE)
+for(i in 1:2) matplot(t(mean.ci[[i]]), type="l", lty=2, col=pal[i], add=TRUE)
+
+#plot(c(0, 100), rep(error.mean.min, 2), type="l", col="#e6e6e6", axes=FALSE, ann=FALSE, bty="n",
+#     xlim=c(1,25), ylim=range(c(unlist(error.mean), unlist(error.quantile)), na.rm=TRUE))
+#matplot(error.mean, type="l", lty=1, col=pal, add=TRUE)
+#for(i in 1:2) matplot(t(error.quantile[[i]]), type="l", lty=2, col=pal[i], add=TRUE)
 nice.axis(1, at=c(1,1:5*5), mgp=c(2,.4,0))
 nice.axis(2, mgp=c(2,.6,0))
 nice.box()
-mtext("F", 1, 1.5)
+mtext(expression(tau), 1, 1.5)
 mtext("Error rate", 2, 2.2)
 
 screen(screens[2])

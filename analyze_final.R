@@ -50,6 +50,8 @@ if(file.exists(out.file)){
     error <- error.sex <-
         list(separate = matrix(NA, length(cv), length(cv)),
              combined = matrix(NA, length(cv), length(cv)))
+    n.error <- list(separate = array(NA, c(2, length(cv), length(cv))),
+                    combined = array(NA, c(2, length(cv), length(cv))))
     sens <- spec <- ppv <- npv <- sub.error <- 
         list(separate = array(NA, c(length(y), length(cv), length(cv))),
              combined = array(NA, c(length(y), length(cv), length(cv))))
@@ -57,7 +59,7 @@ if(file.exists(out.file)){
 }
 cv.feat.sel <- vector("list", length(cv))
 save.assembly <- function()
-    save(probs, error, error.sex, sens, spec, ppv, npv, sub.error, n.sites, file=out.file)
+    save(probs, error, error.sex, n.error, sens, spec, ppv, npv, sub.error, n.sites, file=out.file)
 
 trace.msg(1, "Confirming that the tuning has completed", linebreak=FALSE)
 for(i in seq_along(cv)){
@@ -160,8 +162,10 @@ for(method in names(error)){
                     mean(as.integer(yt) != (2-yh), na.rm=TRUE)
                 }, y[cv[[i]],], as.data.frame(p))
 
-                error[[method]][i, times.chosen] <- mean(!apply(correct[,1:9], 1, all, na.rm=TRUE)[
-                                                             !apply(is.na(correct[,1:9]), 1, all)])
+                n.error[[method]][,i,times.chosen] <- table(factor(
+                    !apply(correct[,1:9], 1, all, na.rm=TRUE)[!apply(is.na(correct[,1:9]), 1, all)],
+                    levels=c(FALSE, TRUE)))
+                error[[method]][i, times.chosen] <- mean(n.error[[method]][,i,times.chosen])
                 error.sex[[method]][i, times.chosen] <- mean(!correct[,10], na.rm=TRUE)
                 sens[[method]][, i, times.chosen] <- sens.spec[1,]
                 spec[[method]][, i, times.chosen] <- sens.spec[2,]
