@@ -45,6 +45,7 @@ out.file <- "results/tuning.Rdata"
 if(file.exists(out.file)){
     load(out.file)
 } else {
+    n.sites <- array(NA, c(length(y), length(cv), length(cv)))
     probs <- list(separate=vector("list", length(cv)),
                   combined=vector("list", length(cv)))
     error <- error.sex <-
@@ -52,14 +53,15 @@ if(file.exists(out.file)){
              combined = matrix(NA, length(cv), length(cv)))
     n.error <- list(separate = array(NA, c(2, length(cv), length(cv))),
                     combined = array(NA, c(2, length(cv), length(cv))))
-    sens <- spec <- ppv <- npv <- sub.error <- 
-        list(separate = array(NA, c(length(y), length(cv), length(cv))),
-             combined = array(NA, c(length(y), length(cv), length(cv))))
-    n.sites <- array(NA, c(length(y), length(cv), length(cv)))
+    conf.tab <- list(separate = array(NA, c(2, 2, length(y), length(cv), length(cv))),
+                     combined = array(NA, c(2, 2, length(y), length(cv), length(cv))))
+    #sens.spec <- true.call.frac <-
+    #    list(separate = array(NA, c(2, length(y), length(cv), length(cv))),
+    #         combined = array(NA, c(2, length(y), length(cv), length(cv))))
 }
 cv.feat.sel <- vector("list", length(cv))
 save.assembly <- function()
-    save(probs, error, error.sex, n.error, sens, spec, ppv, npv, sub.error, n.sites, file=out.file)
+    save(n.sites, probs, error, error.sex, n.error, conf.tab, file=out.file)
 
 trace.msg(1, "Confirming that the tuning has completed", linebreak=FALSE)
 for(i in seq_along(cv)){
@@ -152,8 +154,20 @@ for(method in names(error)){
                 p[is.na(truth[cv[[i]],1]), 1:9] <- NA
                 # Sex does not apply for purified reference samples, e.g. CD19+
                 p[is.na(truth[cv[[i]],"sex"]), "sex"] <- NA 
-
                 correct <- p == truth[cv[[i]],]
+
+                n.error[[method]][,i,times.chosen] <- table(factor(
+                    !apply(correct[,1:9], 1, all, na.rm=TRUE)[!apply(is.na(correct[,1:9]), 1, all)],
+                    levels=c(FALSE, TRUE)))
+                error[[method]][i, times.chosen] <- prop.table(n.error[[method]][,i,times.chosen])[2]
+                error.sex[[method]][i, times.chosen] <- mean(!correct[,10], na.rm=TRUE)
+
+                conf.tab[[method]][,,,i,times.chosen] <- 
+                    mapply(function(yt, yp){
+                        table(yt, factor(yp, levels=c(TRUE, FALSE)))
+                    }, y[cv[[i]],], as.data.frame(p))
+
+
                 sens.spec <- mapply(tapply, as.data.frame(correct), y[cv[[i]],], MoreArgs=list(mean))
                 ppv.npv <- mapply(tapply, as.data.frame(correct),
                                   lapply(as.data.frame(p), factor, levels=c(TRUE, FALSE)),
@@ -162,11 +176,6 @@ for(method in names(error)){
                     mean(as.integer(yt) != (2-yh), na.rm=TRUE)
                 }, y[cv[[i]],], as.data.frame(p))
 
-                n.error[[method]][,i,times.chosen] <- table(factor(
-                    !apply(correct[,1:9], 1, all, na.rm=TRUE)[!apply(is.na(correct[,1:9]), 1, all)],
-                    levels=c(FALSE, TRUE)))
-                error[[method]][i, times.chosen] <- mean(n.error[[method]][,i,times.chosen])
-                error.sex[[method]][i, times.chosen] <- mean(!correct[,10], na.rm=TRUE)
                 sens[[method]][, i, times.chosen] <- sens.spec[1,]
                 spec[[method]][, i, times.chosen] <- sens.spec[2,]
                 ppv[[method]][, i, times.chosen] <- ppv.npv[1,]

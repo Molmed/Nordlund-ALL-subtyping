@@ -5,20 +5,10 @@
 #-------------------------------------------------------------------------------
 
 library(nordlund2013)
-load("results/tuning.Rdata")
-
-qfun <- function(x, q=0:4/4) tryCatch(quantile(x, q, na.rm=TRUE), error=function(...) c(NA, NA))
-error.mean <- sapply(error, apply, 2, mean, na.rm=TRUE)
-error.mean.min <- min(error.mean, na.rm=TRUE)
-error.quantile <- lapply(error, apply, 2, qfun)
-ppv.mean <- lapply(ppv, apply, c(1,3), mean, na.rm=TRUE)
-npv.mean <- lapply(npv, apply, c(1,3), mean, na.rm=TRUE)
-ppv.lim <- range(c(unlist(ppv.mean), unlist(npv.mean)))
-class.labels <- sub("^ref", "Ref", sub("^sex", "Sex",
-        colnames(probs$separate[[11]][[11]])))
-
-qi <- seq(0, 1, length.out=500)
 library(zoo)
+
+is.complete <- function(x) all(!is.na(x))
+qi <- seq(0, 1, length.out=500)
 nk <- function(k, x=c(.025, .975)){
     if(any(is.na(k))){
         rep(NA, length(x))
@@ -28,74 +18,104 @@ nk <- function(k, x=c(.025, .975)){
         approx(p, qi, x)$y
     }
 }
+
+load("results/tuning.Rdata")
+error.mean <- sapply(error, apply, 2, mean, na.rm=TRUE)
+#error.sd <- sapply(error, apply, 2, sd, na.rm=TRUE)
+#appropriate.site.range <- which(diff(apply(error[[1]], 2, is.complete)) != 0) + .5
+error.mean.min <- min(error.mean, na.rm=TRUE)
 ci <- lapply(n.error, apply, 2:3, nk)
-mean.ci <- lapply(ci, apply, c(1,3), mean, na.rm=TRUE)
+ci.mean <- lapply(ci, apply, c(1,3), mean, na.rm=TRUE)
+
+spec <- lapply(conf.tab, function(x)
+    apply(x[1,,,,], 2:4, function(xx) prop.table(xx)[1]))
+mspec <- lapply(spec, apply, c(1,3), mean, na.rm=TRUE)
+spec.lim <- range(unlist(mspec))
+
+matplot(sapply(mspec, "[", 6, T), type="l")
+sub.error.sd <- lapply(sub.error, apply, c(1,3), sd, na.rm=TRUE)
+matplot(sapply(sub.error, apply, c(1,3), mean))
+
+
+true.call.frac <- lapply(conf.tab, function(x)
+    apply(x[,1,,,], 2:4, function(xx) prop.table(xx)[1]))
+true.call.frac.mean <- lapply(true.call.frac, apply, c(1,3), mean, na.rm=TRUE)
+call.lim <- range(unlist(true.call.frac.mean))
+
+#ppv.mean <- lapply(ppv, apply, c(1,3), mean, na.rm=TRUE)
+#npv.mean <- lapply(npv, apply, c(1,3), mean, na.rm=TRUE)
+#ppv.lim <- range(c(unlist(ppv.mean), unlist(npv.mean)))
+class.labels <- sub("^ref", "Ref", sub("^sex", "Sex",
+        colnames(probs$separate[[11]][[11]])))
 
 
 X11(,14/cm(1),12/cm(1))
-pdf("results/S3_tuning.pdf", 14/cm(1), 12/cm(1))
-m <- .5
-pars <- list(ps=8, tcl=-.3, mar=c(3,3,m,m), cex=1)
-pal <- c("blue", "red")
-xd <- .75
-xf <- cumsum(c(0, 1.5, 1,1,1,1)); xf <- xf/tail(xf, 1)
-yf <- cumsum(c(0, 1.5, 1)); yf <- c(yf/tail(yf, 1)/2, 1)
-screens <- split.screen(cbind(
-     left = c(0, xd, xf[c(1:5,1:5)]),
-     right = c(xd, 1, xf[c(2:6,2:6)]),
-     bottom = rep(yf[3:1], c(2,5,5)),
-     top = rep(yf[4:2], c(2,5,5))))
+tryCatch({
+    #pdf("results/S3_tuning_spec.pdf", 14/cm(1), 12/cm(1))
+    m <- .5
+    pars <- list(ps=8, tcl=-.3, mar=c(3,3,m,m), cex=1)
+    pal <- c("blue", "red")
+    xd <- .75
+    xf <- cumsum(c(0, 1.5, 1,1,1,1)); xf <- xf/tail(xf, 1)
+    yf <- cumsum(c(0, 1.5, 1)); yf <- c(yf/tail(yf, 1)/2, 1)
+    screens <- split.screen(cbind(
+         left = c(0, xd, xf[c(1:5,1:5)]),
+         right = c(xd, 1, xf[c(2:6,2:6)]),
+         bottom = rep(yf[3:1], c(2,5,5)),
+         top = rep(yf[4:2], c(2,5,5))))
 
-screen(screens[1])
-do.call(par, pars)
-matplot(1:25, t(error.quantile[[1]]), lty=c(3:1,2:3), type="l", col=pal[1], xlim=range(unlist()
-matplot(1:25, t(error.quantile[[2]]), lty=c(3:1,2:3), type="l", col=pal[2], add=TRUE)
-
-plot(c(0, 100), rep(error.mean.min, 2), type="l", col="#e6e6e6", axes=FALSE, ann=FALSE, bty="n",
-     xlim=c(1,25), ylim=range(c(unlist(error.mean), unlist(mean.ci)), na.rm=TRUE))
-matplot(error.mean, type="l", lty=1, col=pal, add=TRUE)
-for(i in 1:2) matplot(t(mean.ci[[i]]), type="l", lty=2, col=pal[i], add=TRUE)
-
-#plot(c(0, 100), rep(error.mean.min, 2), type="l", col="#e6e6e6", axes=FALSE, ann=FALSE, bty="n",
-#     xlim=c(1,25), ylim=range(c(unlist(error.mean), unlist(error.quantile)), na.rm=TRUE))
-#matplot(error.mean, type="l", lty=1, col=pal, add=TRUE)
-#for(i in 1:2) matplot(t(error.quantile[[i]]), type="l", lty=2, col=pal[i], add=TRUE)
-nice.axis(1, at=c(1,1:5*5), mgp=c(2,.4,0))
-nice.axis(2, mgp=c(2,.6,0))
-nice.box()
-mtext(expression(tau), 1, 1.5)
-mtext("Error rate", 2, 2.2)
-
-screen(screens[2])
-par(mar=c(m,m,m,m))
-blank.plot()
-legend("top", c("Separate", "Combined", "", "Upper panel:", "80% CI", "", "Lower panels:", "PPV", "NPV"),
-    lty=c(1,1,NA,NA,2,NA,NA,1:2), col=c(pal,NA,NA,"black",NA,NA,"black", "black"),
-    xpd=TRUE, bty="n")
-
-pars$mar[3] <- 1
-for(i in 1:10){
-    screen(screens[i+2])
-    pars$mar[1] <- if(i < 6) m else 2.5
-    pars$mar[2] <- if(i %% 5 == 1) 3 else m
+    screen(screens[1])
     do.call(par, pars)
-    blank.plot(c(1,25), c(0,0), ylim=ppv.lim)
-    hlines(ceiling(ppv.lim[1]*10):10/10, col="#e6e6e6")
-    matplot(sapply(ppv.mean, "[", i, T), type="l", col=pal, lty=1, add=TRUE)
-    matplot(sapply(npv.mean, "[", i, T), type="l", col=pal, lty=2, add=TRUE)
-    if(i > 5){
-        nice.axis(1, at=c(1, 1:5*5), mgp=c(2,.4,0))
-        mtext("F", 1, 1.5)
-    }
-    if((i-1) %% 5 == 0){
-        nice.axis(2, mgp=c(2,.6,0))
-        mtext("PPV, NPV", 2, 2.2)
-    }
+    plot(c(0, 100), rep(error.mean.min, 2), type="l", col="#e6e6e6", axes=FALSE, ann=FALSE, bty="n",
+         xlim=c(1,25), ylim=range(c(unlist(error.mean), unlist(ci.mean)), na.rm=TRUE))
+    #vlines(appropriate.site.range, col="#e6e6e6", lty=2)
+    matplot(error.mean, type="l", lty=1, col=pal, add=TRUE)
+    for(i in 1:2) matplot(t(ci.mean[[i]]), type="l", lty=2, col=pal[i], add=TRUE)
+
+    #plot(c(0, 100), rep(error.mean.min, 2), type="l", col="#e6e6e6", axes=FALSE, ann=FALSE, bty="n",
+    #     xlim=c(1,25), ylim=range(c(unlist(error.mean), unlist(error.quantile)), na.rm=TRUE))
+    #matplot(error.mean, type="l", lty=1, col=pal, add=TRUE)
+    #for(i in 1:2) matplot(t(error.quantile[[i]]), type="l", lty=2, col=pal[i], add=TRUE)
+    nice.axis(1, at=c(1,1:5*5), mgp=c(2,.4,0))
+    nice.axis(1, at=setdiff(2:24, 1:4*5), labels=rep("", 19), mgp=c(2,.4,0), tck=-0.02)
+    nice.axis(2, mgp=c(2,.6,0))
     nice.box()
-    mtext(class.labels[i], 3, .1)
-}
-close.screen(all=TRUE)
-dev.off()
+    mtext(expression(tau), 1, 1.3)
+    mtext("Error rate", 2, 2.2)
+
+    screen(screens[2])
+    par(mar=c(m,m,m,m))
+    blank.plot()
+    legend(-1.3, 1.6, c(
+        "Subtype\nCpG sites\nused separately\n(separate\napproach)\n",
+        "Consensus\nCpG sites\nused together\n(combined\napproach)\n"),
+        lty=c(1,1), col=pal, xpd=TRUE, bty="n", adj=c(0, .94))
+    legend(-1.3, -.3, c("Mean\n", "95% credibile\ninterval"),
+        lty=1:2, col=c("black", "black"), xpd=TRUE, bty="n", adj=c(0, .75))
+
+    pars$mar[3] <- 1
+    for(i in 2:10){
+        screen(screens[i+2])
+        pars$mar[1] <- if(i < 6) m else 2.5
+        pars$mar[2] <- if(i %% 5 == 1) 3 else m
+        do.call(par, pars)
+        blank.plot(c(1,25), c(0,0), ylim=spec.lim)
+        hlines(90:100/100, col="#e6e6e6")
+        matplot(sapply(mspec, "[", i, T), type="l", col=pal, lty=1, add=TRUE)
+        if(i > 5){
+            nice.axis(1, at=c(1, 1:5*5), mgp=c(2,.4,0))
+            mtext(expression(tau), 1, 1.3)
+        }
+        if((i-1) %% 5 == 0){
+            nice.axis(2, mgp=c(2,.6,0), at=91:100/100)
+            if(i == 1) mtext("Proportion of patients accurately classified", 2, 2.2, at=.5, xpd=TRUE)
+        }
+        nice.box()
+        mtext(class.labels[i], 3, .1)
+    }
+    close.screen(all=TRUE)
+    #dev.off()
+}, error=function(...) dev.off())
 
 
 #===============================================================================

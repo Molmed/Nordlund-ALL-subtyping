@@ -6,7 +6,7 @@
 ##' @author Christofer \enc{Bäcklin}{Backlin}
 ##' @export
 blank.plot <- function(x=0, y=0, ...)
-    plot(x, y, ..., type="n", ann=FALSE, axes=FALSE)
+    plot(x, y, ..., type="n", ann=FALSE, axes=FALSE, xaxs="i", yaxs="i")
 
 
 ##' Add vertical or horizontal lines to a plot
