@@ -18,6 +18,8 @@ nk <- function(k, x=c(.025, .975)){
         approx(p, qi, x)$y
     }
 }
+class.labels <- sub("^ref", "Ref", sub("^sex", "Sex",
+        colnames(probs$separate[[11]][[11]])))
 
 load("results/tuning.Rdata")
 error.mean <- sapply(error, apply, 2, mean, na.rm=TRUE)
@@ -27,14 +29,14 @@ error.mean.min <- min(error.mean, na.rm=TRUE)
 ci <- lapply(n.error, apply, 2:3, nk)
 ci.mean <- lapply(ci, apply, c(1,3), mean, na.rm=TRUE)
 
-spec <- lapply(conf.tab, function(x)
+sens <- lapply(conf.tab, function(x)
     apply(x[1,,,,], 2:4, function(xx) prop.table(xx)[1]))
+spec <- lapply(conf.tab, function(x)
+    apply(x[2,,,,], 2:4, function(xx) prop.table(xx)[2]))
+msens <- lapply(sens, apply, c(1,3), mean, na.rm=TRUE)
 mspec <- lapply(spec, apply, c(1,3), mean, na.rm=TRUE)
+sens.lim <- range(unlist(msens))
 spec.lim <- range(unlist(mspec))
-
-matplot(sapply(mspec, "[", 6, T), type="l")
-sub.error.sd <- lapply(sub.error, apply, c(1,3), sd, na.rm=TRUE)
-matplot(sapply(sub.error, apply, c(1,3), mean))
 
 
 true.call.frac <- lapply(conf.tab, function(x)
@@ -42,27 +44,30 @@ true.call.frac <- lapply(conf.tab, function(x)
 true.call.frac.mean <- lapply(true.call.frac, apply, c(1,3), mean, na.rm=TRUE)
 call.lim <- range(unlist(true.call.frac.mean))
 
-#ppv.mean <- lapply(ppv, apply, c(1,3), mean, na.rm=TRUE)
-#npv.mean <- lapply(npv, apply, c(1,3), mean, na.rm=TRUE)
-#ppv.lim <- range(c(unlist(ppv.mean), unlist(npv.mean)))
-class.labels <- sub("^ref", "Ref", sub("^sex", "Sex",
-        colnames(probs$separate[[11]][[11]])))
 
-
-X11(,14/cm(1),12/cm(1))
+X11(,14/cm(1),18/cm(1))
 tryCatch({
-    #pdf("results/S3_tuning_spec.pdf", 14/cm(1), 12/cm(1))
+    pdf("results/S3_tuning_spec.pdf", 14/cm(1), 18/cm(1))
     m <- .5
     pars <- list(ps=8, tcl=-.3, mar=c(3,3,m,m), cex=1)
     pal <- c("blue", "red")
-    xd <- .75
-    xf <- cumsum(c(0, 1.5, 1,1,1,1)); xf <- xf/tail(xf, 1)
-    yf <- cumsum(c(0, 1.5, 1)); yf <- c(yf/tail(yf, 1)/2, 1)
+    xd <- .7
+    # The lower panels' relative widths
+    xf <- c(0, 1.5, 1,1,1,1)
+    # The lower panels' relative left/right coordinates in the figure
+    xf <- cumsum(xf)
+    xf <- xf/tail(xf, 1)
+    # The lower panels' relative heights
+    yf <- c(0, 1.5, 1, 1.5, 1)
+    # All panels' relative bottom/top coordinates in the figure
+    yf <- cumsum(yf)
+    yf <- c(yf/tail(yf, 1)*2/3, 1)
+    
     screens <- split.screen(cbind(
-         left = c(0, xd, xf[c(1:5,1:5)]),
-         right = c(xd, 1, xf[c(2:6,2:6)]),
-         bottom = rep(yf[3:1], c(2,5,5)),
-         top = rep(yf[4:2], c(2,5,5))))
+         left = c(0, xd, xf[rep(1:5, 4)]),
+         right = c(xd, 1, xf[rep(2:6, 4)]),
+         bottom = rep(yf[5:1], c(2,5,5,5,5)),
+         top = rep(yf[6:2], c(2,5,5,5,5))))
 
     screen(screens[1])
     do.call(par, pars)
@@ -86,36 +91,61 @@ tryCatch({
     screen(screens[2])
     par(mar=c(m,m,m,m))
     blank.plot()
-    legend(-1.3, 1.6, c(
-        "Subtype\nCpG sites\nused separately\n(separate\napproach)\n",
-        "Consensus\nCpG sites\nused together\n(combined\napproach)\n"),
-        lty=c(1,1), col=pal, xpd=TRUE, bty="n", adj=c(0, .94))
-    legend(-1.3, -.3, c("Mean\n", "95% credibile\ninterval"),
+    legend(-1.4, 1.4, c(
+        "Consensus CpG sites\nused together\n(combined approach)\n",
+        "Subtype CpG sites\nused separately\n(separate approach)\n"),
+        lty=c(1,1), col=rev(pal), xpd=TRUE, bty="n", adj=c(0, .94))
+    legend(-1.4, 0, c("Mean\n", "95% credibile\ninterval"),
         lty=1:2, col=c("black", "black"), xpd=TRUE, bty="n", adj=c(0, .75))
 
     pars$mar[3] <- 1
-    for(i in 2:10){
+    # Sensitivity
+    for(i in 1:10){
         screen(screens[i+2])
         pars$mar[1] <- if(i < 6) m else 2.5
         pars$mar[2] <- if(i %% 5 == 1) 3 else m
         do.call(par, pars)
+        blank.plot(c(1,25), c(0,0), ylim=sens.lim)
+        hlines(2:5/5, col="#e6e6e6")
+        matplot(sapply(msens, "[", i, T), type="l", col=pal, lty=1, add=TRUE)
+        if(i > 5){
+            nice.axis(1, at=c(1, 1:5*5), mgp=c(2,.4,0))
+            mtext(expression(tau), 1, 1.2)
+        }
+        if((i-1) %% 5 == 0){
+            nice.axis(2, mgp=c(2,.6,0), at=2:5/5)
+            if(i == 1) mtext("Sensitivity", 2, 2.2, at=fig.usr()[1], xpd=TRUE)
+        }
+        nice.box()
+        mtext(class.labels[i], 3, .1)
+    }
+    # Specificity
+    for(i in 1:10){
+        screen(screens[i+12])
+        pars$mar[1] <- if(i < 6) m else 2.5
+        pars$mar[2] <- if(i %% 5 == 1) 3 else m
+        do.call(par, pars)
         blank.plot(c(1,25), c(0,0), ylim=spec.lim)
-        hlines(90:100/100, col="#e6e6e6")
+        hlines(46:50/50, col="#e6e6e6")
         matplot(sapply(mspec, "[", i, T), type="l", col=pal, lty=1, add=TRUE)
         if(i > 5){
             nice.axis(1, at=c(1, 1:5*5), mgp=c(2,.4,0))
-            mtext(expression(tau), 1, 1.3)
+            mtext(expression(tau), 1, 1.2)
         }
         if((i-1) %% 5 == 0){
-            nice.axis(2, mgp=c(2,.6,0), at=91:100/100)
-            if(i == 1) mtext("Proportion of patients accurately classified", 2, 2.2, at=.5, xpd=TRUE)
+            nice.axis(2, mgp=c(2,.6,0), at=46:50/50)
+            if(i == 1) mtext("Specificity", 2, 2.2, at=fig.usr()[1], xpd=TRUE)
         }
         nice.box()
         mtext(class.labels[i], 3, .1)
     }
     close.screen(all=TRUE)
-    #dev.off()
-}, error=function(...) dev.off())
+},
+error = function(...) cat("Oh no!"),
+finally = {
+    close.screen(all=TRUE)
+    dev.off()
+})
 
 
 #===============================================================================
