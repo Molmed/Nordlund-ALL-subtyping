@@ -7,7 +7,8 @@ Date: 2013-10-17
 Author: Christofer Backlin, Jessica Nordlund
 Maintainer: Christofer Backlin <christofers.backlin@medsci.uu.se>
 Description: Some functions implemented in C to speed up computations.
-Depends: predict
+Depends:
+    predict
 License: GPL (>=2)
 NeedsCompilation: yes
 LazyLoad: yes

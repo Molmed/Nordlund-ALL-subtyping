@@ -9,6 +9,8 @@ library(zoo)
 
 is.complete <- function(x) all(!is.na(x))
 qi <- seq(0, 1, length.out=500)
+##' @param k A vector of counts where the first element is the correct
+##'   classifications and the second is the incorrect classifications.
 nk <- function(k, x=c(.025, .975)){
     if(any(is.na(k))){
         rep(NA, length(x))

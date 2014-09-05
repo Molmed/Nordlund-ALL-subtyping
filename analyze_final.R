@@ -166,20 +166,6 @@ for(method in names(error)){
                     mapply(function(yt, yp){
                         table(yt, factor(yp, levels=c(TRUE, FALSE)))
                     }, y[cv[[i]],], as.data.frame(p))
-
-
-                sens.spec <- mapply(tapply, as.data.frame(correct), y[cv[[i]],], MoreArgs=list(mean))
-                ppv.npv <- mapply(tapply, as.data.frame(correct),
-                                  lapply(as.data.frame(p), factor, levels=c(TRUE, FALSE)),
-                                  MoreArgs=list(mean))
-                sub.error[[method]][, i, times.chosen] <- mapply(function(yt, yh){
-                    mean(as.integer(yt) != (2-yh), na.rm=TRUE)
-                }, y[cv[[i]],], as.data.frame(p))
-
-                sens[[method]][, i, times.chosen] <- sens.spec[1,]
-                spec[[method]][, i, times.chosen] <- sens.spec[2,]
-                ppv[[method]][, i, times.chosen] <- ppv.npv[1,]
-                npv[[method]][, i, times.chosen] <- ppv.npv[2,]
             }
         }
         cat(".")
@@ -307,16 +293,18 @@ save.workspace()
 #   Make a summary table
 #-------------------------------------------------------------------------------
 
+sens <- apply(conf.tab$combined[1,,,,times.chosen], 2:3, prop.table)[1,,]
+spec <- apply(conf.tab$combined[2,,,,times.chosen], 2:3, prop.table)[2,,]
+
 write.table(
     data.frame(
         subtype = names(y),
-        sens.mean = apply(sens$combined[,,times.chosen], 1, mean),
-        sens.sd   = apply(sens$combined[,,times.chosen], 1, sd),
-        spec.mean = apply(spec$combined[,,times.chosen], 1, mean),
-        spec.sd   = apply(sens$combined[,,times.chosen], 1, sd),
+        sens.mean = apply(sens, 1, mean),
+        sens.sd   = apply(sens, 1, sd),
+        spec.mean = apply(spec, 1, mean),
+        spec.sd   = apply(spec, 1, sd),
         n.min     = apply(n.sites[,,times.chosen], 1, min),
         n.max     = apply(n.sites[,,times.chosen], 1, max),
         n.cc      = sapply(feat.sel, function(x) sum(x >= times.chosen))),
     file="results/sens_spec_table.csv", sep=",", row.names=FALSE)
-
 
