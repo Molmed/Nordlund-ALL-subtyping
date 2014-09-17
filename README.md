@@ -1,9 +1,8 @@
 Manuscript: ALL subtyping based on 450k methylation assay
 ======================
 
-[Nordlund J](http://scholar.google.se/citations?user=ZztFeTEAAAAJ), [Bäcklin C](http://scholar.google.se/citations?user=ZMtuZXsAAAAJ), ...
-
-Original publication: [to be added](#)
+[Nordlund](http://scholar.google.se/citations?user=ZztFeTEAAAAJ) et al. 2014, 
+original publication to be added.
 
 This code was produced by the groups of [Cancer Pharmacology and Computational Medicine](http://www.medsci.uu.se/research/Cancer/Cancer+Pharmacology+and+Computational+Medicine/) and [Molecular Medicine](http://www.molmed.medsci.uu.se/) at the [Department of Medical Sciences](http://www.medsci.uu.se) at [Uppsala University](http://www.uu.se).
 
@@ -25,14 +24,26 @@ At peak memory, 20 GB of RAM is required (in `process_methylation.R`). If you wi
 
 Instructions
 ------------
-The most convenient way to run the analysis is to clone the repo to your computer and run the files as shown below (commands for unix/linux). Notice that `analyze_tune.R` and `analyze_final.R` are designed to run on multiple CPU cores, and that you manually need to specify how many to use by editing the files, setting the variable `number.of.cores`. `analyze_tune.R` can also be run on multiple machines to reduce computation time further, see the comments in beginnig of the file for instructions.
+The most convenient way to run the analysis is to clone the repo to your computer and run the files as shown below (commands for unix/linux).
 
-    git clone git@github.com:Molmed/Nordlund-2013.git
-    cd Nordlund-2013
+    git clone git@github.com:Molmed/Nordlund-ALL-subtyping.git
+
+### Replication of the study
+The replicate the entire training procedure to create the classifier used for
+final prediction run the following commands.
+
+    cd Nordlund-ALL-subtyping
     R -f setup.R
     R -f analyze_tune.R
     R -f analyze_final.R
 
+Notice that `analyze_tune.R` and `analyze_final.R` are designed to run on multiple CPU cores, and that you manually need to specify how many to use by editing the files, setting the variable `number.of.cores`. `analyze_tune.R` can also be run on multiple machines to reduce computation time further, see the comments in beginnig of the file for instructions.
+
 - `setup.R` will download all data from [GEO](http://www.ncbi.nlm.nih.gov/geo/) and prepare it for use in R.
 - `analyze_tune.R` will perform the doubly cross validated feature selection routine necessary for model parameter tuning and performance estimation.
 - `analyze_final.R` will perform the model tuning, estimate performance and build the the final model that was presented in the paper. It will also produce some tables of the results.
+
+### Use the final classifier directly
+To use the trained classifier on your own data follow the instructions in the
+script [classifier/classifier.R](classifier/classifier.R).
+

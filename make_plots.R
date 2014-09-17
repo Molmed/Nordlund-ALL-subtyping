@@ -182,6 +182,78 @@ dev.off()
 
 
 #===============================================================================
+#   ROC-curves
+#-------------------------------------------------------------------------------
+
+contingency <- structure(vector("list", length(y)), names=names(y))
+pb <- txtProgressBar(max=10*2*25, style=3)
+for(my.class in names(y)){
+    contingency[[my.class]] <- lapply(probs, function(pp){
+        Map(function(p, fold){
+            pb$up(pb$getVal() + 1)
+            pr <- p[[17]][,my.class]
+            threshold <- sort(unique(c(pr, Inf)))
+            tab <- sapply(threshold, function(thr)
+                table(y[fold, my.class], factor(pr >= thr, levels=c(TRUE, FALSE),
+                                                labels=levels(y[[my.class]]))))
+            tab <- structure(as.data.frame(t(tab)),
+                                     names=c("TP", "FP", "FN", "TN"))
+            transform(tab,
+                sensitivity = TP/(TP+FN),
+                specificity = TN/(FP+TN),
+                precision = TP/(TP+FP),
+                recall = TP/(TP+FN)
+            )
+        }, pp, cv)
+    })
+}
+close(pb)
+
+X11(,16/cm(1), 7/cm(1))
+local({
+    pdf("results/roc.pdf", 16/cm(1), 7/cm(1))
+    par(mfrow=c(2, 5), mar=c(.4, .4, 1, .4), oma=c(2.1,2.7,.4,.4), ps=8, cex=1, tcl=-.3, mgp=c(1.7, .6, 0))
+    spec <- 0:100/100
+    for(i in seq_along(contingency)){
+        sens <- lapply(contingency[[i]], sapply,
+            function(co) approx(co$specificity, co$sensitivity, spec, ties=max)$y)
+        matplot(c(1-spec, 0), rbind(sapply(sens, apply, 1, quantile, .05), 0),
+                type="l", col=c(4,2), lty=2, ylim=0:1, ann=FALSE, axes=FALSE)
+        matplot(c(1-spec, 0), rbind(sapply(sens, apply, 1, mean), 0),
+                col=c(4,2), type="l", lty=1, add=TRUE)
+        segments(0, 0, 1, 1, lty=3)
+        nice.box()
+        if(i > 5) nice.axis(1, mgp=c(1.7, .4, 0))
+        if(i %in% c(1, 6)) nice.axis(2)
+        mtext(names(y)[i], 3, .3)
+    }
+    mtext("1 - Specificity", 1, 1, outer=TRUE)
+    mtext("Sensitivity", 2, 1.7, outer=TRUE)
+    dev.off()
+})
+
+local({
+    pdf("results/precision-recall.pdf", 16/cm(1), 7/cm(1))
+    par(mfrow=c(2, 5), mar=c(.4, .4, 1, .4), oma=c(2.1,2.7,.4,.4), ps=8, cex=1, tcl=-.3, mgp=c(1.7, .6, 0))
+    sens <- 0:100/100
+    for(i in seq_along(contingency)){
+        prec <- lapply(contingency[[i]], sapply, function(co)
+            approx(co$sensitivity, fill(co$precision, is.nan, 1), sens, ties=max)$y)
+        matplot(sens, sapply(prec, apply, 1, quantile, .05, na.rm=TRUE), type="l",
+                col=c(4,2), lty=2, ylim=0:1, ann=FALSE, axes=FALSE)
+        matplot(sens, sapply(prec, apply, 1, mean), col=c(4,2), type="l", lty=1, add=TRUE)
+        nice.box()
+        if(i > 5) nice.axis(1, mgp=c(1.7, .4, 0))
+        if(i %in% c(1, 6)) nice.axis(2)
+        mtext(names(y)[i], 3, .3)
+    }
+    mtext("Precision- curves", 3, .3, outer=TRUE)
+    mtext("Recall", 1, 1, outer=TRUE)
+    mtext("Precision", 2, 1.7, outer=TRUE)
+    dev.off()
+})
+
+#===============================================================================
 #   Plot validation set classifications
 #-------------------------------------------------------------------------------
 

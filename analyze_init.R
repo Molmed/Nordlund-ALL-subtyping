@@ -35,7 +35,7 @@ tryCatch({
     # Remove sample not used in the study
     # and sites that did not pass quality control
     sample.idx <- !is.na(met.pheno$subtype) & !grepl("rep[2-9]$", met.pheno$id)
-    site.idx <- met.annot$analyzed
+    site.idx <- met.annot$analysed
         # ^^^ needs to be saved as a separate variable since we need it later
     met.pheno <- met.pheno[sample.idx,]
     met.data <- t(met.data[site.idx, sample.idx])

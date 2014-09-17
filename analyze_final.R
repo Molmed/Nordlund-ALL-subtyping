@@ -182,9 +182,6 @@ save.assembly()
 #   parallelization.
 #-------------------------------------------------------------------------------
 
-#merr <- sapply(error, apply, 2, mean)
-#which(merr == min(merr, na.rm=TRUE), arr.ind=TRUE)
-
 times.chosen <- 17
 
 
@@ -210,29 +207,39 @@ if(any(sapply(feat.sel, is.null)))
 
 cons.sites <- do.call(rbind, lapply(names(y), function(my.class){
     data.frame(Subtype = factor(my.class, levels=names(y)),
-               TargetID = met.annot$TargetID[feat.sel[[my.class]] >= times.chosen],
+               met.annot[feat.sel[[my.class]] >= times.chosen,
+                         c("TargetID", "CHR", "MAPINFO")],
                stringsAsFactors=FALSE)
 }))
-write.table(cons.sites, "results/consensus_sites.csv", quote=FALSE, sep=",",
+write.table(cons.sites, "classifier/consensus_sites.csv", quote=FALSE, sep=",",
             row.names=FALSE)
 
 
 #-------------------------------o
 #   Train consensus classifiers
 
-#cons.met <- list(
-#    impute.knn(met.data[, met.annot$TargetID %in% cons.sites$TargetID &
-#                          met.annot$CHR %in% 1:22], distmat="auto"),
-#    impute.knn(met.data[,met.annot$TargetID %in% cons.sites$TargetID],
-#               distmat="auto"))
-#for(my.class in names(y)){
-#    cat("Making final classifier for", my.class, "\n")
-#    idx <- !is.na(y[[my.class]])
-#    cons[[my.class]] <- design("nsc",
-#        cons.met[[if(my.class == "sex") 2 else 1]][idx,], y[[my.class]][idx],
-#        cv = list(nrep=25, nfold=8),
-#        slim.fit = TRUE)
-#}
+load("data/annotations.Rdata")
+load("data/methylation.Rdata")
+load("data/phenotypes.Rdata")
+met.data <- t(met.data[,sample.idx])
+met.pheno <- met.pheno[sample.idx,]
+
+
+# Combined approach
+ind <- match(cons.sites$TargetID, met.annot$TargetID)
+cons.met <- list(
+    impute.knn(met.data[,ind[!cons.sites$CHR %in% "X"]], distmat="auto"),
+    impute.knn(met.data[,ind], distmat="auto"))
+for(my.class in names(y)){
+    cat("Making final classifier for", my.class, "\n")
+    idx <- !is.na(y[[my.class]])
+    cons[[my.class]] <- design("nsc",
+        cons.met[[if(my.class == "sex") 2 else 1]][idx,], y[[my.class]][idx],
+        cv = list(nrep=25, nfold=8),
+        slim.fit = TRUE)
+}
+
+# Separate approach
 cons.met <- lapply(with(cons.sites, split(TargetID, Subtype)),
     function(ids) impute.knn(met.data[,met.annot$TargetID %in% ids], distmat="auto"))
 for(my.class in names(y)){
@@ -243,6 +250,15 @@ for(my.class in names(y)){
         thres = 0, cv = list(nrep=25, nfold=8),
         slim.fit = TRUE)
 }
+local({
+    cons <- lapply(cons, function(con){
+        con$fit$threshold <- min(con$fit$threshold[con$cv$error == min(con$cv$error)])
+        con$fit[c("sample.subset", "y", "yhat", "prob")] <- NULL
+        con$fit
+    })
+    #dir.create("classifier")
+    save(cons, file="classifier/classifier.Rdata")
+})
 
 
 #-------------------------------o
@@ -268,20 +284,10 @@ write.table(cons.pred, "results/consensus_predictions.csv",
 
 library(analyse450k)
 load.450k.data("subtype_validation", complete=TRUE)
-val.met <- t(val.met[site.idx,])
-
-#val.cons <- list(
-#    impute.knn(val.met[, met.annot$TargetID %in% cons.sites$TargetID &
-#                         met.annot$CHR %in% 1:22], distmat="auto"),
-#    impute.knn(val.met[, met.annot$TargetID %in% cons.sites$TargetID],
-#               distmat="auto"))
-val.cons <- lapply(with(cons.sites, split(TargetID, Subtype)),
-    function(ids) impute.knn(val.met[,met.annot$TargetID %in% ids], distmat="auto"))
 
 val.pred <- data.frame(val.pheno,
-    mapply(function(fit, dat) predict(fit, dat, threshold=min)$prob[,1],
-           cons, val.cons[rep(1:2, c(9,1))], SIMPLIFY=FALSE),
-    check.names=FALSE)
+    cc(val.met, met.annot$TargetID, samples.as="columns"))
+names(val.pred)[11:19] <- names(cons)[1:9]
 
 write.table(val.pred, "results/validation_predictions.csv",
     quote=FALSE, sep=",", row.names=FALSE)

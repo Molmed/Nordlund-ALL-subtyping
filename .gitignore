@@ -13,3 +13,5 @@ tuning
 *.roxygen
 *.Rcheck
 .*.swp
+.Rhistory
+.RData
