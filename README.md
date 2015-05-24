@@ -1,8 +1,8 @@
-Manuscript: ALL subtyping based on 450k methylation assay
+ALL subtyping based on 450k methylation assay
 ======================
 
-[Nordlund](http://scholar.google.se/citations?user=ZztFeTEAAAAJ) et al. 2014, 
-[Provisional PDF in Clinical Epigenetics](http://www.clinicalepigeneticsjournal.com/content/7/1/11/abstract)
+Original pubilcation: [Nordlund](http://scholar.google.se/citations?user=ZztFeTEAAAAJ) et al. 2014, 
+[DNA methylation-based subtype prediction for pediatric acute lymphoblastic leukemia](http://www.clinicalepigeneticsjournal.com/content/7/1/11/abstract)
 
 This code was produced by the groups of [Cancer Pharmacology and Computational Medicine](http://www.medsci.uu.se/research/Cancer/Cancer+Pharmacology+and+Computational+Medicine/) and [Molecular Medicine](http://www.molmed.medsci.uu.se/) at the [Department of Medical Sciences](http://www.medsci.uu.se) at [Uppsala University](http://www.uu.se).
 
