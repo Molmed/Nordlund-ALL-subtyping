@@ -68,7 +68,7 @@ get.consensus.classifier <- function(){
         }, numeric(ncol(x)))
         colnames(probability)[10] <- "female"
 
-        i <- !colnames(probability) %in% c("reference", "sex")
+        i <- !colnames(probability) %in% c("reference", "female")
         subtype.hits <- probability[,i] >= .5
         n.hits <- apply(subtype.hits, 1, sum)
         data.frame(subtype = factor(
