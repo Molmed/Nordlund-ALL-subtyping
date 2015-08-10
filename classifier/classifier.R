@@ -66,7 +66,7 @@ get.consensus.classifier <- function(){
             pamr.predict(subtype.classifier, x, type = "posterior",
                          threshold = subtype.classifier$threshold)[,1]
         }, numeric(ncol(x)))
-        names(probability)[10] <- "female"
+        colnames(probability)[10] <- "female"
 
         i <- !colnames(probability) %in% c("reference", "sex")
         subtype.hits <- probability[,i] >= .5
